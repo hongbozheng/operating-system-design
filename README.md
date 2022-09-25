@@ -3,7 +3,7 @@
 ##### Instructor: Tianyin Xu
 
 ## Repository
-#### MP1 - [Introduction to Linux Kernel Programming](https://gitlab.engr.illinois.edu/hongboz2/distributed_systems/-/tree/main/Event_Logging)
+#### MP1 - [Introduction to Linux Kernel Programming](https://gitlab.engr.illinois.edu/hongboz2/operating_system_design/-/tree/main/MP1)
 
 Create a Linux Kernel Module (LKM) that measures the Userspace CPU Time of processes registered within the kernel module
 

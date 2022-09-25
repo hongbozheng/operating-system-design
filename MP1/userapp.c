@@ -21,7 +21,7 @@ int main(int argc, char* argv[])
 	if (fd >= 0) {
 		char buffer[BUFSIZ];
 		read(fd, buffer, BUFSIZ);
-		puts(buffer);
+		//puts(buffer);
 		close(fd);
 	}
 	return 0;

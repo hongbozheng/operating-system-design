@@ -20,8 +20,9 @@ MODULE_DESCRIPTION("CS-423 MP1");
 #define FILENAME        "status"    // filename
 #define TIME_INTERVAL   5000        // time interval
 
-LIST_HEAD(proc_list);               // init proc_list
+LIST_HEAD(proc_list);               // head of proc_list
 
+// create proc_struct
 // Reference: https://www.gnu.org/software/libc/manual/html_node/Data-Structures.html
 typedef struct {
     struct list_head list;
@@ -29,12 +30,16 @@ typedef struct {
     unsigned long cpu_time;
 } proc_struct;
 
-static spinlock_t lock; // Reference: https://docs.oracle.com/cd/E26502_01/html/E35303/ggecq.html
+// create spinlock
+// Reference: https://docs.oracle.com/cd/E26502_01/html/E35303/ggecq.html
+static spinlock_t lock;
 
+// create pro_dir_entry struct
 // Reference: https://tuxthink.blogspot.com/2012/01/creating-folder-under-proc-and-creating.html
 // struct hold info about the /proc file
 static struct proc_dir_entry *proc_dir, *proc_entry;
 
+// create proc_fops struct
 // Reference: https://tldp.org/LDP/lkmpg/2.4/html/c577.htm
 // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch03s03.html
 static ssize_t proc_read(struct file *file, char __user *buf, size_t size, loff_t *offl);
@@ -44,10 +49,10 @@ static const struct proc_ops proc_fops = {
     .proc_write = proc_write
 };
 
-static struct timer_list timer;
+static struct timer_list timer;     // create timer_list
 // Reference: https://docs.kernel.org/core-api/workqueue.html
-static struct workqueue_struct *wq;
-static struct work_struct *work;
+static struct workqueue_struct *wq; // create workqueue_struct
+static struct work_struct *work;    // create work_struct
 
 // function signature
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offl);

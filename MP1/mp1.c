@@ -1,6 +1,6 @@
 #define LINUX
 
-#include "mp1.h"
+#include "mp1.h"    // mp1 header file
 
 /**
  * function to read /proc file
@@ -17,6 +17,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     char *buf;
     proc_struct *ps;
     
+    // check the access of the buffer
     if (!access_ok(buffer, size)) {
         printk(KERN_ERR "User Buffer is NOT WRITABLE\n");
         return -EINVAL;
@@ -25,19 +26,19 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     //Reference: https://www.kernel.org/doc/html/latest/core-api/memory-allocation.html
     buf = (char *)kmalloc(size, GFP_KERNEL);
 
-    // enter critical section
-    spin_lock_irqsave(&lock, flag);
+    spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
     list_for_each_entry(ps, &proc_list, list) {
         byte_cpy += sprintf(buf + byte_cpy, "%u: %u\n", ps->pid, jiffies_to_msecs(clock_t_to_jiffies(ps->cpu_time)));
     }
-    spin_unlock_irqrestore(&lock, flag);
+    spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
 
-    buf[byte_cpy] = '\0';
+    buf[byte_cpy] = '\0';                   // null terminate buf
 
     cpy_kernel_byte = copy_to_user(buffer, buf, byte_cpy);
     if (cpy_kernel_byte != 0){
         printk(KERN_ERR "copy_to_user failed\n");
     }
+    *offl += byte_cpy;
 
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-hacking/routines-kmalloc.html
     kfree(buf);
@@ -59,32 +60,33 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
     char *buf;
     proc_struct *ps;
     
+    // check the access of the buffer
     if (!access_ok(buffer, size)) {
         printk(KERN_ERR "Buffer is NOT READABLE\n");
         return -EINVAL;
     }
 
-    // initialize tmp->list
     ps = (proc_struct *)kmalloc(sizeof(proc_struct), GFP_KERNEL);
-    INIT_LIST_HEAD(&(ps->list));
+    //INIT_LIST_HEAD(&(ps->list));            // init ps->list
 
-    // set tmp->pid
     buf = (char *)kmalloc(size+ 1, GFP_KERNEL);
+    if (buf == NULL) {
+        printk(KERN_ERR "Cannot allocate kernel memory\n");
+        return -ENOMEM;
+    }
+
     cpy_usr_byte = copy_from_user(buf, buffer, size);
     if (cpy_usr_byte != 0) {
         printk(KERN_ERR "copy_from_user fail\n");
     }
 
-    buf[size] = '\0';
-    sscanf(buf, "%u", &ps->pid);
+    buf[size] = '\0';                       // null terminate buf
+    sscanf(buf, "%u", &ps->pid);            // read buf and write to ps->pid
+    ps->cpu_time = 0;                       // init ps->cpu_time to 0
 
-    // initial tmp->cpu_time
-    ps->cpu_time = 0;
-
-    // add tmp to mp1_proc_list
-    spin_lock_irqsave(&lock, flag);
-    list_add(&(ps->list), &proc_list);
-    spin_unlock_irqrestore(&lock, flag);
+    spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
+    list_add_tail(&(ps->list), &proc_list); // add list to proc_list
+    spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
 
     kfree(buf);
 
@@ -111,17 +113,16 @@ static void update_cpu_time(struct work_struct *work) {
     unsigned long flag, cpu_time;
     proc_struct *pos, *n;
 
-    // enter critical section
-    spin_lock_irqsave(&lock, flag);
+    spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
     list_for_each_entry_safe(pos, n, &proc_list, list) {
         if (get_cpu_use(pos->pid, &cpu_time) == 0) {
-			pos->cpu_time = cpu_time;
+			pos->cpu_time = cpu_time;       // update cpu_time
 		} else {
 			list_del(&pos->list);
 			kfree(pos);
 		}
     }
-    spin_unlock_irqrestore(&lock, flag);
+    spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
 
     mod_timer(&timer, jiffies + msecs_to_jiffies(TIME_INTERVAL));
 }
@@ -166,7 +167,7 @@ int __init mp1_init(void) {
     // init work
     work = (struct work_struct *)kmalloc(sizeof(struct work_struct), GFP_KERNEL);
     INIT_WORK(work, update_cpu_time);
-
+    
     // init spin_lock
     spin_lock_init(&lock);
 
@@ -199,7 +200,7 @@ void __exit mp1_exit(void) {
     flush_workqueue(wq);                    // ensure that any scheduled work has run to completion
     destroy_workqueue(wq);                  // safely destroy a workqueue
     
-    kfree(work);
+    kfree(work);                            // free work
 
     printk(KERN_ALERT "MP1 MODULE UNLOADED\n");
 }

@@ -32,6 +32,7 @@ typedef struct {
 static spinlock_t lock; // Reference: https://docs.oracle.com/cd/E26502_01/html/E35303/ggecq.html
 
 // Reference: https://tuxthink.blogspot.com/2012/01/creating-folder-under-proc-and-creating.html
+// struct hold info about the /proc file
 static struct proc_dir_entry *proc_dir, *proc_entry;
 
 // Reference: https://tldp.org/LDP/lkmpg/2.4/html/c577.htm

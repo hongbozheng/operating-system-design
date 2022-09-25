@@ -2,6 +2,15 @@
 
 #include "mp1.h"
 
+/**
+ * function to read /proc file
+ * 
+ * @param *file     file to read
+ * @param *buffer   user buffer
+ * @param size      size of user buffer
+ * @param *offl     offset in the file
+ * @return ssize_t  number of byte copied
+ */
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offl) {
     unsigned long flag, cpy_kernel_byte;
     unsigned long byte_cpy = 0;
@@ -36,6 +45,15 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     return byte_cpy;
 }
 
+/**
+ * function to write /proc file
+ * 
+ * @param *file     file to write
+ * @param *buffer   user buffer
+ * @param size      size of user buffer
+ * @param *offl     offset in the file
+ * @return size     number of byte written
+ */
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offl) {
     unsigned long flag, cpy_usr_byte;
     char *buf;
@@ -73,10 +91,22 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
     return size;
 }
 
+/**
+ * invoke callback once after the timer elapses
+ *
+ * @param   *timer  ptr to timer
+ * @return  void
+ */
 static void callback(struct timer_list *timer) {
     queue_work(wq, work);
 }
 
+/**
+ * work function to update cpu time
+ *
+ * @param   *work ptr to work
+ * @return  void
+ */
 static void update_cpu_time(struct work_struct *work) {
     unsigned long flag, cpu_time;
     proc_struct *pos, *n;
@@ -96,7 +126,12 @@ static void update_cpu_time(struct work_struct *work) {
     mod_timer(&timer, jiffies + msecs_to_jiffies(TIME_INTERVAL));
 }
 
-// mp1_init - Called when module is loaded
+/**
+ * called when mp1 module is loaded
+ *
+ * @param   void
+ * @return  int 0-success, other-failed
+ */
 int __init mp1_init(void) {
     #ifdef DEBUG
     printk(KERN_ALERT "MP1 MODULE LOADING\n");
@@ -139,7 +174,12 @@ int __init mp1_init(void) {
     return 0;   
 }
 
-// mp1_exit - Called when module is unloaded
+/**
+ * called when mp1 module is unloaded
+ *
+ * @param   void
+ * @return  void
+ */
 void __exit mp1_exit(void) {
     proc_struct *pos, *n;
 
@@ -150,10 +190,10 @@ void __exit mp1_exit(void) {
     remove_proc_entry(FILENAME, proc_dir);  // remove /proc/mp1/status
     remove_proc_entry(DIRECTORY, NULL);     // remove /proc/mp1
     del_timer_sync(&timer);                 // free timer
-
+    
     list_for_each_entry_safe(pos, n, &proc_list, list) {
-        list_del(&pos->list);
-        kfree(pos);
+        list_del(&pos->list);               // delete proc_list
+        kfree(pos);                         // free proc_list
     }
     
     flush_workqueue(wq);                    // ensure that any scheduled work has run to completion

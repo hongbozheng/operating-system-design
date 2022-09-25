@@ -12,38 +12,74 @@
  * @return ssize_t  number of byte copied
  */
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offl) {
-    unsigned long flag, cpy_kernel_byte;
-    unsigned long byte_cpy = 0;
-    char *buf;
+	unsigned long flag, cpy_kernel_byte;
+	ssize_t byte_read = 0;
+	size_t len = 0;
+	char *kbuf;
     proc_struct *ps;
-    
-    // check the access of the buffer
+	struct status_buf *sbuf;
+
+	// check the access of the buffer
     if (!access_ok(buffer, size)) {
         printk(KERN_ERR "User Buffer is NOT WRITABLE\n");
-        return -EINVAL;
-    }
-    
-    //Reference: https://www.kernel.org/doc/html/latest/core-api/memory-allocation.html
-    buf = (char *)kmalloc(size, GFP_KERNEL);
+		return -EINVAL;
+	}
 
+	// Check if the user has already read part of the buffer
+	if (*offl || file->private_data) {
+		sbuf = file->private_data;
+		len = sbuf->size;
+		kbuf = sbuf->buf;
+
+        // check if the user has already reach EOF
+		if (*offl >= len) {
+		    return 0;
+
+	    // copy the remain buf to user space
+        } else {
+			byte_read = (len- *offl < size) ? (len - *offl) : size;
+            cpy_kernel_byte = copy_to_user(buffer, kbuf + *offl, byte_read);
+            if (cpy_kernel_byte != 0) {
+                printk(KERN_ERR "copy_to_user failed\n");
+            }
+			byte_read -= cpy_kernel_byte;   // update byte_read
+			*offl += byte_read;             // update file offset
+		}
+	    return byte_read;
+	}
+
+    // allocate memory according to list size
+	spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
+	list_for_each_entry(ps, &proc_list, list) ++len;
+	spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
+
+	sbuf = kmalloc(sizeof(struct status_buf) + len * MAX_STR_LEN, GFP_KERNEL);
+	if (sbuf == NULL) {
+        printk(KERN_ERR "Fail to allocate memory in kernel\n");
+		return -ENOMEM;
+	}
+
+	len *= MAX_STR_LEN;
+	kbuf = sbuf->buf;
+	file->private_data = sbuf;
+	
     spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
-    list_for_each_entry(ps, &proc_list, list) {
-        byte_cpy += sprintf(buf + byte_cpy, "%u: %u\n", ps->pid, jiffies_to_msecs(clock_t_to_jiffies(ps->cpu_time)));
-    }
-    spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
+	list_for_each_entry(ps, &proc_list, list) {
+		byte_read += scnprintf(kbuf + byte_read, len - byte_read, "%d: %lu\n", ps->pid, ps->cpu_time);
+		if (byte_read >= len) break;        // break if user read size or more byte
+	}
+	spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
 
-    buf[byte_cpy] = '\0';                   // null terminate buf
-
-    cpy_kernel_byte = copy_to_user(buffer, buf, byte_cpy);
-    if (cpy_kernel_byte != 0){
+	sbuf->size = byte_read;                 // store byte_read in status buf struct
+	byte_read = (byte_read < size) ? byte_read : size;
+    cpy_kernel_byte = copy_to_user(buffer, kbuf, byte_read);
+    if (cpy_kernel_byte != 0) {
         printk(KERN_ERR "copy_to_user failed\n");
     }
-    *offl += byte_cpy;
+	byte_read -= cpy_kernel_byte;           // update byte_read
+	*offl += byte_read;                     // update file offset
 
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-hacking/routines-kmalloc.html
-    kfree(buf);
-
-    return byte_cpy;
+	return byte_read;
 }
 
 /**
@@ -57,7 +93,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
  */
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offl) {
     unsigned long flag, cpy_usr_byte;
-    char *buf;
+    char *kbuf;
     proc_struct *ps;
     
     // check the access of the buffer
@@ -66,31 +102,42 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
         return -EINVAL;
     }
 
-    ps = (proc_struct *)kmalloc(sizeof(proc_struct), GFP_KERNEL);
-    //INIT_LIST_HEAD(&(ps->list));            // init ps->list
-
-    buf = (char *)kmalloc(size+ 1, GFP_KERNEL);
-    if (buf == NULL) {
-        printk(KERN_ERR "Cannot allocate kernel memory\n");
+    kbuf = (char *)kmalloc(size+ 1, GFP_KERNEL);
+    if (kbuf == NULL) {
+        printk(KERN_ERR "Fail to allocate memory in kernel\n");
         return -ENOMEM;
     }
 
-    cpy_usr_byte = copy_from_user(buf, buffer, size);
+    cpy_usr_byte = copy_from_user(kbuf, buffer, size);
     if (cpy_usr_byte != 0) {
         printk(KERN_ERR "copy_from_user fail\n");
     }
 
-    buf[size] = '\0';                       // null terminate buf
-    sscanf(buf, "%u", &ps->pid);            // read buf and write to ps->pid
+    ps = (proc_struct *)kmalloc(sizeof(proc_struct), GFP_KERNEL);
+
+    kbuf[size] = '\0';                      // null terminate kbuf
+    sscanf(kbuf, "%u", &ps->pid);           // read buf and write to ps->pid
     ps->cpu_time = 0;                       // init ps->cpu_time to 0
 
     spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
     list_add_tail(&(ps->list), &proc_list); // add list to proc_list
     spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
 
-    kfree(buf);
+    kfree(kbuf);
 
     return size;
+}
+
+/**
+ * called when a process closes the file
+ *
+ * @param *inode ptr to inode
+ * @param *file ptr to file
+ * @return int 0-suceess, other-fail
+ */
+static int proc_release(struct inode *inode, struct file *file) {
+    kfree(file->private_data);
+    return 0;
 }
 
 /**
@@ -101,6 +148,7 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
  */
 static void callback(struct timer_list *timer) {
     queue_work(wq, work);
+    mod_timer(timer, jiffies + msecs_to_jiffies(TIME_INTERVAL));
 }
 
 /**
@@ -123,8 +171,6 @@ static void update_cpu_time(struct work_struct *work) {
 		}
     }
     spin_unlock_irqrestore(&lock, flag);    // exit critical section, restore flags
-
-    mod_timer(&timer, jiffies + msecs_to_jiffies(TIME_INTERVAL));
 }
 
 /**

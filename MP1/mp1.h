@@ -20,7 +20,7 @@ MODULE_DESCRIPTION("CS-423 MP1");
 #define FILENAME        "status"    // filename
 #define TIME_INTERVAL   5000        // time interval
 
-LIST_HEAD(proc_list);               // init list
+LIST_HEAD(proc_list);               // init proc_list
 
 // Reference: https://www.gnu.org/software/libc/manual/html_node/Data-Structures.html
 typedef struct {
@@ -48,6 +48,11 @@ static struct timer_list timer;
 static struct workqueue_struct *wq;
 static struct work_struct *work;
 
+// function signature
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offl);
+static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offl);
+static void callback(struct timer_list *timer);
+static void update_cpu_time(struct work_struct *work);
 int __init mp1_init(void);
 void __exit mp1_exit(void);
 

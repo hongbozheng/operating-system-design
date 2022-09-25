@@ -3,38 +3,33 @@
 #include "mp1.h"
 
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offl) {
-    unsigned long flag, cpy_kernel_byte;     // store spin_lock flags
+    unsigned long flag, cpy_kernel_byte;
     unsigned long byte_cpy = 0;
     char *buf;
-    proc_struct *proc_struct;
-
-    //Reference: https://www.kernel.org/doc/html/latest/core-api/memory-allocation.html
-    buf = (char *)kmalloc(size, GFP_KERNEL);
-
-    // check if the buffer is writable
+    proc_struct *ps;
+    
     if (!access_ok(buffer, size)) {
         printk(KERN_ERR "User Buffer is NOT WRITABLE\n");
         return -EINVAL;
     }
-
-    //if (*offl || file->private_data) {
-    //    return 0;
-    //}
     
+    //Reference: https://www.kernel.org/doc/html/latest/core-api/memory-allocation.html
+    buf = (char *)kmalloc(size, GFP_KERNEL);
+
+    // enter critical section
     spin_lock_irqsave(&lock, flag);
-    list_for_each_entry(proc_struct, &proc_list, list) {
-        byte_cpy += sprintf(buffer + byte_cpy, "%u: %u\n",
-                proc_struct->pid, jiffies_to_msecs(clock_t_to_jiffies(proc_struct->cpu_time)));
+    list_for_each_entry(ps, &proc_list, list) {
+        byte_cpy += sprintf(buf + byte_cpy, "%u: %u\n", ps->pid, jiffies_to_msecs(clock_t_to_jiffies(ps->cpu_time)));
     }
     spin_unlock_irqrestore(&lock, flag);
 
-    buf[byte_cpy] = '\0';    // NULL terminate buffer
+    buf[byte_cpy] = '\0';
 
     cpy_kernel_byte = copy_to_user(buffer, buf, byte_cpy);
     if (cpy_kernel_byte != 0){
         printk(KERN_ERR "copy_to_user failed\n");
     }
-    
+
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-hacking/routines-kmalloc.html
     kfree(buf);
 
@@ -44,28 +39,33 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offl) {
     unsigned long flag, cpy_usr_byte;
     char *buf;
-    proc_struct *proc_struct;
+    proc_struct *ps;
     
     if (!access_ok(buffer, size)) {
         printk(KERN_ERR "Buffer is NOT READABLE\n");
         return -EINVAL;
     }
 
-    proc_struct = kmalloc(sizeof(proc_struct), GFP_KERNEL);
-    INIT_LIST_HEAD(&(proc_struct->list));
+    // initialize tmp->list
+    ps = (proc_struct *)kmalloc(sizeof(proc_struct), GFP_KERNEL);
+    INIT_LIST_HEAD(&(ps->list));
 
-    buf = (char *)kmalloc(size+1, GFP_KERNEL);
+    // set tmp->pid
+    buf = (char *)kmalloc(size+ 1, GFP_KERNEL);
     cpy_usr_byte = copy_from_user(buf, buffer, size);
     if (cpy_usr_byte != 0) {
         printk(KERN_ERR "copy_from_user fail\n");
     }
+
     buf[size] = '\0';
-    sscanf(buf, "%u", &proc_struct->pid);
+    sscanf(buf, "%u", &ps->pid);
 
-    proc_struct->cpu_time = 0;
+    // initial tmp->cpu_time
+    ps->cpu_time = 0;
 
+    // add tmp to mp1_proc_list
     spin_lock_irqsave(&lock, flag);
-    list_add(&(proc_struct->list), &proc_list);
+    list_add(&(ps->list), &proc_list);
     spin_unlock_irqrestore(&lock, flag);
 
     kfree(buf);
@@ -73,7 +73,7 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
     return size;
 }
 
-void callback (struct timer_list *timer) {
+static void callback(struct timer_list *timer) {
     queue_work(wq, work);
 }
 
@@ -81,30 +81,26 @@ static void update_cpu_time(struct work_struct *work) {
     unsigned long flag, cpu_time;
     proc_struct *pos, *n;
 
-    spin_lock_irqsave(&lock,flag);
-    
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-for-each-entry-safe.html
+    // enter critical section
+    spin_lock_irqsave(&lock, flag);
     list_for_each_entry_safe(pos, n, &proc_list, list) {
         if (get_cpu_use(pos->pid, &cpu_time) == 0) {
-            pos->cpu_time = cpu_time;
-        } else {
-            // Reference: https://www.kernel.org/doc/html/v5.7/core-api/kernel-api.html
-            list_del(&pos->list);
-            kfree(pos);
-        }
+			pos->cpu_time = cpu_time;
+		} else {
+			list_del(&pos->list);
+			kfree(pos);
+		}
     }
-    spin_unlock_irqrestore(&lock,flag);
+    spin_unlock_irqrestore(&lock, flag);
 
     mod_timer(&timer, jiffies + msecs_to_jiffies(TIME_INTERVAL));
 }
 
 // mp1_init - Called when module is loaded
-int __init mp1_init(void)
-{
+int __init mp1_init(void) {
     #ifdef DEBUG
     printk(KERN_ALERT "MP1 MODULE LOADING\n");
     #endif
-    // Insert your code here ...
     
     // create /proc/mp1 dir
     // Reference: https://tuxthink.blogspot.com/2012/01/creating-folder-under-proc-and-creating.html
@@ -144,16 +140,15 @@ int __init mp1_init(void)
 }
 
 // mp1_exit - Called when module is unloaded
-void __exit mp1_exit(void)
-{
+void __exit mp1_exit(void) {
     proc_struct *pos, *n;
 
     #ifdef DEBUG
     printk(KERN_ALERT "MP1 MODULE UNLOADING\n");
     #endif
     
-    remove_proc_entry(FILENAME, proc_dir);   // remove /proc/mp1/status
-    remove_proc_entry(DIRECTORY, NULL);      // remove /proc/mp1
+    remove_proc_entry(FILENAME, proc_dir);  // remove /proc/mp1/status
+    remove_proc_entry(DIRECTORY, NULL);     // remove /proc/mp1
     del_timer_sync(&timer);                 // free timer
 
     list_for_each_entry_safe(pos, n, &proc_list, list) {

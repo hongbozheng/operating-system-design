@@ -28,6 +28,7 @@ test_kernel_module_1.sh
 ```
 
 #### 2. Test with 2 userapp
+Run the following command
 ```
 test_kernel_module_2.sh
 ```
@@ -68,7 +69,7 @@ test_kernel_module_2.sh
 
 ##### 8. Timer & Interrupt
 * For each 5 seconds, the timer `callback` function will be triggered
-* When `callback` function is called, it will add `work` into the queue which is the function `update_cpu_time`
+* When `callback` function is called, it will add `work` which is the function `update_cpu_time` into the queue
 * Then it sets the timer expiration time to 5 seconds in the future
 
 ## Developers

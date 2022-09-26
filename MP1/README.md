@@ -72,5 +72,19 @@ test_kernel_module_2.sh
 * When `callback` function is called, it will add `work` which is the function `update_cpu_time` into the queue
 * Then it sets the timer expiration time to 5 seconds in the future
 
+##### 9. workqueue & work
+* `workqueue` allow kernel functions to be activated and later executed by special kernel threads called `worker` threads
+* `work` init `work` to be the function `update_cpu_time`
+* `update_cpu_time` function will traverse the linked list, and use the function `get_cpu_time` in `mp1_given.h` file to update the cpu_time for each process
+* Everytime the timer expires, the `work` is enqueued into `workqueue`
+
+##### 10. exit
+* remove `proc_entry` which is `/proc/mp1/status` file
+* remove `proc_dir` which is `/proc/mp1` directory
+* delete & free `timer`
+* delete & free the memory of the linked list with `list_for_each_entry_safe` macro
+* ensure that any scheduled work has run to completion with `flush_workqueue`, and safely destroy a `workqueue`
+* free the memory of `struct work_struct`
+
 ## Developers
 * Hongbo Zheng [NetID: hongboz2]

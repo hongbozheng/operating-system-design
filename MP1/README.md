@@ -35,6 +35,8 @@ test_kernel_module_2.sh
 
 ## Design
 
+#### mp1.h & mp1.c
+
 ##### 1. Initialize `struct proc_dir_entry`
 * `proc_dir` for directory
 * `proc_entry` for status file
@@ -85,6 +87,10 @@ test_kernel_module_2.sh
 * delete & free the memory of the linked list with `list_for_each_entry_safe` macro
 * ensure that any scheduled work has run to completion with `flush_workqueue`, and safely destroy a `workqueue`
 * free the memory of `struct work_struct`
+
+#### userapp.h & userapp.c
+* register the program into `/proc/mp1/status` with its `PID`
+* run the `while` loop for a specified time period (10s in this case)
 
 ## Developers
 * Hongbo Zheng [NetID: hongboz2]

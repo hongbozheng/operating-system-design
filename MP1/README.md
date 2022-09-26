@@ -34,83 +34,42 @@ test_kernel_module_2.sh
 
 ## Design
 
-#### Location of the log collected on VMs
-* The log for `3 nodes, 2Hz each, running for 100s` is located in the folder `Event_Logging_Analysis/ThreeNode_Log`
-* The log for `8 nodes, 5Hz each, running for 100s` is located in the folder `Event_Logging_Analysis/EightNode_Log`
+##### 1. Initialize `struct proc_dir_entry`
+* `proc_dir` for directory
+* `proc_entry` for status file
 
-#### Plot TimeDelay & Bandwidth vs Time for Three Nodes
-The following python file is used to create the plots for Three-Node Log
-* ThreeNode_TimeDelay_DataLength_Node_CentralizedLogger.py
+##### 2. Create process directory and file
+* create `/proc/mp1` directory
+* create `/proc/mp1/status` file
 
-To plot and save the figures for Three-Node Log
+##### 3. Initialize other module
+* `spinlock` write protection
+* `struct timer_list` check cpu_time after timer expires
+* `struct workqueue_struct` schedule actions to run in process context
+* `struct work_struct` schedule a task to run at a later time
 
-```
-python ThreeNode_TimeDelay_Bandwith.py -n <Node#> -n1 <Node1LogPath> -n2 <Node2LogPath> -n3 <Node3LogPath>
-```
-`<Node#>` Total number of nodes [`3`in this case]
+##### 4. Create `struct proc_ops`
+* `proc_read` process read from file
+* `proc_write`  process write to file
+* `proc_release` process closes the file
 
-`<Node1LogPath>` Path to node 1 Log [node1.csv file]
+##### 5. `proc_read` function
+* Check if the user already read part of the file
+* Continue from the file left off position if the file is already read
+* Otherwise read from the beginning of the file and then update the file offset `offl`
+* Create struct `status_buf` to store the status file buffer and size
 
-`<Node2LogPath>` Path to node 2 Log [node2.csv file]
+##### 6. `proc_write` function
+* In `userapp.c` open `/proc/mp1/status` file and write the `process ID (PID)` in the file
+* In `mp1.c`, use `sscanf` to write `PID` into `proc_struct->pid`
 
-`<Node3LogPath>` Path to node 3 Log [node3.csv file]
+##### 7. `proc_release` function
+* free `file->private_data` when the process closes the file
 
-Example: `<Node1LogPath>` for `Three-Node Log` will be
-```
-Event_Logging_Analysis/ThreeNode_Log/node1.csv
-```
-
-#### Plot TimeDelay & Bandwidth vs Time for Eight Nodes
-The following python file is used to create the plots for Eight-Node Log
-* EightNode_TimeDelay_DataLength_Node_CentralizedLogger.py
-
-To plot and save the figures for Eight-Node Log
-
-Please type the following commands in the `SAME` row, new line is added for `display purpose`.
-
-```
-python ThreeNode_TimeDelay_Bandwith.py -n <Node#> -n1 <Node1LogPath> -n2 <Node2LogPath> -n3 <Node3LogPath> -n4 <Node4LogPath> -n5 <Node5LogPath> -n6 <Node6LogPath> -n7 <Node7LogPath> -n8 <Node8LogPath>
-```
-`<Node#>` Total number of nodes [`8`in this case]
-
-`<Node1LogPath>` Path to node 1 log [node1.csv file]
-
-`<Node2LogPath>` Path to node 2 log [node2.csv file]
-
-`<Node3LogPath>` Path to node 3 log [node3.csv file]
-
-`<Node4LogPath>` Path to node 4 log [node4.csv file]
-
-`<Node5LogPath>` Path to node 5 log [node5.csv file]
-
-`<Node6LogPath>` Path to node 6 log [node6.csv file]
-
-`<Node7LogPath>` Path to node 7 log [node7.csv file]
-
-`<Node8LogPath>` Path to node 8 log [node8.csv file]
-
-Example: `<Node1LogPath>` for `Eight-Node Log` will be
-```
-Event_Logging_Analysis/EightNode_Log/node1.csv
-```
-
-#### TimeDelay & Bandwidth vs Time Plots
-The plots for `Three-Node Log` are saved in the following folders
-* Event_Logging_Analysis/ThreeNode_TimeDelay_Plot
-* Event_Logging_Analysis/ThreeNode_Bandwidth_Plot
-
-The plots for `Eight-Node Log` are saved in the following folders
-* Event_Logging_Analysis/EightNode_TimeDelay_Plot
-* Event_Logging_Analysis/EightNode_Bandwidth_Plot
-
-Each `Event_Logging_Analysis/X_TimeDelay_Plot` folder contains the following graphs
-* X_Minimum_Time_Delay_vs_Time
-* X_Maximum_Time_Delay_vs_Time
-* X_Median_Time_Delay_vs_Time
-* X_Ninety_Percentile_Time_Delay_vs_Time
-
-Each `Event_Logging_Analysis/X_Bandwidth_Plot` folder contains the following graph
-* X_AverageBandwidth_vs_Time
+##### 8. Timer & Interrupt
+* For each 5 seconds, the timer `callback` function will be triggered
+* When `callback` function is called, it will add `work` into the queue which is the function `update_cpu_time`
+* Then it sets the timer expiration time to 5 seconds in the future
 
 ## Developers
 * Hongbo Zheng [NetID: hongboz2]

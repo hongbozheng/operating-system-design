@@ -30,7 +30,7 @@ rms_task_struct *get_highest_priority_ready_task(void)
 {
     rms_task_struct *tmp, *result = NULL;
 
-    mutex_lock_interruptible(&struct_list_mutex);
+    mutex_lock_interruptible(&mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         // make sure the task's state is READY
         if (tmp->state != READY) {
@@ -45,33 +45,27 @@ rms_task_struct *get_highest_priority_ready_task(void)
             }
         }
     }
-    mutex_unlock(&struct_list_mutex);
+    mutex_unlock(&mutex);
 
     return result;
 }
 
-int admission_control(unsigned int computation, unsigned int period)
-{
-    unsigned int sum_ratio = 0;
-    unsigned int util_bound = 69300;
-    unsigned int multiplier = 100000;
+int admission_control(unsigned long computation, unsigned long period) {
+    unsigned long util_factor = 0;
     rms_task_struct *tmp;
 
     // accumulate all tasks' ratio already in the list
-    mutex_lock_interruptible(&struct_list_mutex);
+    mutex_lock_interruptible(&mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        sum_ratio += (tmp->computation * multiplier) / tmp->period;
+        util_factor += (tmp->computation * MULTIPLIER) / tmp->period;
     }
-    mutex_unlock(&struct_list_mutex);
+    mutex_unlock(&mutex);
 
     // add the ratio of the new task
-    sum_ratio += (computation * multiplier) / period;
+    util_factor += (computation * MULTIPLIER) / period;
 
-    if (sum_ratio <= util_bound) {
-        return 1;
-    } else {
-        return 0;
-    }
+    if(util_factor <= UTIL_BOUND) return 1;
+    return 0;
 }
 
 void __set_priority(rms_task_struct *task, int policy, int priority)
@@ -135,11 +129,11 @@ static ssize_t mp2_read(struct file *file, char __user *buffer, size_t count, lo
     buf = (char *)kmalloc(count, GFP_KERNEL);
 
     // loop through the tasks in the list
-    mutex_lock_interruptible(&struct_list_mutex);
+    mutex_lock_interruptible(&mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         copied += sprintf(buf + copied, "%u: %u, %u\n", tmp->pid, tmp->period, tmp->computation);
     }
-    mutex_unlock(&struct_list_mutex);
+    mutex_unlock(&mutex);
 
     buf[copied] = '\0';
 
@@ -182,12 +176,12 @@ void mp2_register_processs(char *buf)
     }
 
     // add task to rms_task_struct_list
-    mutex_lock_interruptible(&struct_list_mutex);
+    mutex_lock_interruptible(&mutex);
     list_add(&(tmp->list), &rms_task_struct_list);
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
         printk(KERN_ALERT "Hello %ld %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
     }
-    mutex_unlock(&struct_list_mutex);
+    mutex_unlock(&mutex);
 }
 
 void mp2_yield_process(char *buf)
@@ -199,9 +193,9 @@ void mp2_yield_process(char *buf)
 
     // set task to tmp
     sscanf(buf, "%u", &pid);
-    mutex_lock_interruptible(&struct_list_mutex);
+    mutex_lock_interruptible(&mutex);
     tmp = __get_task_by_pid(pid);
-    mutex_unlock(&struct_list_mutex);
+    mutex_unlock(&mutex);
 
     if (tmp->deadline == 0) {
         // initial deadline when the task first time yield
@@ -243,11 +237,11 @@ void mp2_unregister_process(char *buf)
     sscanf(buf, "%u", &pid);
 
     // find and delete the task from rms_task_struct_list
-    mutex_lock_interruptible(&struct_list_mutex);
+    mutex_lock_interruptible(&mutex);
     tmp = __get_task_by_pid(pid);
     del_timer(&tmp->wakeup_timer);
     list_del(&tmp->list);
-    mutex_unlock(&struct_list_mutex);
+    mutex_unlock(&mutex);
 
     // if the current_running_task is the deleting task, set current_running_task to NULL
     mutex_lock_interruptible(&cur_running_task_mutex);
@@ -287,11 +281,6 @@ static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t co
 
     return count;
 }
-
-static const struct proc_ops mp2_fops = {
-    .proc_read    = mp2_read,
-    .proc_write   = mp2_write
-};
 
 // mp2_init - Called when module is loaded
 static int __init mp2_init(void)
@@ -340,7 +329,7 @@ static void __exit mp2_exit(void)
     remove_proc_entry(DIRECTORY, NULL);
 
     // destroy all mutexes
-    mutex_destroy(&struct_list_mutex);
+    mutex_destroy(&mutex);
     mutex_destroy(&cur_running_task_mutex);
 
     // stop the dispatching thread

@@ -13,18 +13,20 @@ MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Group_ID");
 MODULE_DESCRIPTION("CS-423 MP2");
 
-#define DEBUG            1
-#define FILENAME         "status"
-#define DIRECTORY        "mp2"
-#define REGISTRATION     'R'
-#define YIELD            'Y'
-#define DEREGISTRATION   'D'
-#define SLEEPING         1
-#define READY            2
-#define RUNNING          3
+#define DEBUG           1
+#define FILENAME        "status"
+#define DIRECTORY       "mp2"
+#define REGISTRATION    'R'
+#define YIELD           'Y'
+#define DEREGISTRATION  'D'
+#define SLEEPING        1
+#define READY           2
+#define RUNNING         3
+#define UTIL_BOUND      69300
+#define MULTIPLIER      100000
 
 LIST_HEAD(rms_task_struct_list);
-DEFINE_MUTEX(struct_list_mutex);
+DEFINE_MUTEX(mutex);
 DEFINE_MUTEX(cur_running_task_mutex);
 
 typedef struct rms_task_struct{
@@ -43,6 +45,12 @@ typedef struct rms_task_struct{
 
 static spinlock_t lock;
 static struct proc_dir_entry *proc_dir, *proc_entry;
+static ssize_t mp2_read(struct file *file, char __user *buffer, size_t count, loff_t *data);
+static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t count, loff_t *data);
+static const struct proc_ops mp2_fops = {
+        .proc_read    = mp2_read,
+        .proc_write   = mp2_write
+};
 static struct task_struct *dispatch_thread;
 static rms_task_struct *current_running_task = NULL;
 static struct kmem_cache *mp2_task_struct_cache;

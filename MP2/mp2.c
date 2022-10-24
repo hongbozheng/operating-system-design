@@ -30,7 +30,7 @@ rms_task_struct *get_highest_priority_ready_task(void)
 {
     rms_task_struct *tmp, *result = NULL;
 
-    mutex_lock_interruptible(&rms_task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         // make sure the task's state is READY
         if (tmp->state != READY) {
@@ -45,7 +45,7 @@ rms_task_struct *get_highest_priority_ready_task(void)
             }
         }
     }
-    mutex_unlock(&rms_task_list_mutex);
+    mutex_unlock(&task_list_mutex);
 
     return result;
 }
@@ -55,11 +55,11 @@ int admission_control(unsigned long computation, unsigned long period) {
     rms_task_struct *tmp;
 
     // accumulate all tasks' ratio already in the list
-    mutex_lock_interruptible(&rms_task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         util_factor += (tmp->computation * MULTIPLIER) / tmp->period;
     }
-    mutex_unlock(&rms_task_list_mutex);
+    mutex_unlock(&task_list_mutex);
 
     // add the ratio of the new task
     util_factor += (computation * MULTIPLIER) / period;
@@ -70,9 +70,6 @@ int admission_control(unsigned long computation, unsigned long period) {
 
 void __set_priority(rms_task_struct *task, int policy, int priority)
 {
-    //struct sched_param sparam;
-    //sparam.sched_priority = priority;
-    //sched_setscheduler_nocheck(task->linux_task, policy, &sparam);
     // https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
     struct sched_attr sattr;
     sattr.sched_policy = policy;
@@ -94,26 +91,26 @@ static int dispatch_thread_fn(void *data)
             return 0;
         }
 
-        mutex_lock_interruptible(&cur_rms_task_mutex);
+        mutex_lock_interruptible(&cur_task_mutex);
         if ((tmp = get_highest_priority_ready_task()) == NULL) {
             // no READY task
-            if (current_running_task != NULL) {
-                // lower the priority of the current_running_task
-                __set_priority(current_running_task, SCHED_NORMAL, 0);
+            if (cur_task != NULL) {
+                // lower the priority of the cur_task
+                __set_priority(cur_task, SCHED_NORMAL, 0);
             }
         } else {
-            if (current_running_task != NULL && tmp->period < current_running_task->period) {
-                // preemption, set the current_running_task to READY
-                current_running_task->state = READY;
-                __set_priority(current_running_task, SCHED_NORMAL, 0);
+            if (cur_task != NULL && tmp->period < cur_task->period) {
+                // preemption, set the cur_task to READY
+                cur_task->state = READY;
+                __set_priority(cur_task, SCHED_NORMAL, 0);
             }
             // wake up tmp (highest priority READY task)
             tmp->state = RUNNING;
             wake_up_process(tmp->linux_task);
             __set_priority(tmp, SCHED_FIFO, 99);
-            current_running_task = tmp;
+            cur_task = tmp;
         }
-        mutex_unlock(&cur_rms_task_mutex);
+        mutex_unlock(&cur_task_mutex);
     }
 }
 
@@ -129,11 +126,11 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, l
     buf = (char *)kmalloc(count, GFP_KERNEL);
 
     // loop through the tasks in the list
-    mutex_lock_interruptible(&rms_task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         copied += sprintf(buf + copied, "%d: %lu, %lu\n", tmp->pid, tmp->period, tmp->computation);
     }
-    mutex_unlock(&rms_task_list_mutex);
+    mutex_unlock(&task_list_mutex);
 
     buf[copied] = '\0';
 
@@ -141,12 +138,11 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, l
 
     kfree(buf);
 
-    // return copied
     *data = 1;
     return copied;
 }
 
-void mp2_register_processs(char *buf)
+void mp2_register_process(char *buf)
 {
     printk(KERN_ALERT "MP2 register process\n");
     rms_task_struct *tmp;
@@ -176,12 +172,12 @@ void mp2_register_processs(char *buf)
     }
 
     // add task to rms_task_struct_list
-    mutex_lock_interruptible(&rms_task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex);
     list_add(&(tmp->list), &rms_task_struct_list);
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
         printk(KERN_ALERT "Hello %d %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
     }
-    mutex_unlock(&rms_task_list_mutex);
+    mutex_unlock(&task_list_mutex);
 }
 
 void mp2_yield_process(char *buf)
@@ -193,9 +189,9 @@ void mp2_yield_process(char *buf)
 
     // set task to tmp
     sscanf(buf, "%u", &pid);
-    mutex_lock_interruptible(&rms_task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex);
     tmp = __get_task_by_pid(pid);
-    mutex_unlock(&rms_task_list_mutex);
+    mutex_unlock(&task_list_mutex);
 
     if (tmp->deadline == 0) {
         // initial deadline when the task first time yield
@@ -216,10 +212,10 @@ void mp2_yield_process(char *buf)
     mod_timer(&(tmp->wakeup_timer), tmp->deadline);
     // set state to SLEEPING
     tmp->state = SLEEPING;
-    // reset current_running_task to NULL
-    mutex_lock_interruptible(&cur_rms_task_mutex);
-    current_running_task = NULL;
-    mutex_unlock(&cur_rms_task_mutex);
+    // reset cur_task to NULL
+    mutex_lock_interruptible(&cur_task_mutex);
+    cur_task = NULL;
+    mutex_unlock(&cur_task_mutex);
     // wake up scheduler
     wake_up_process(dispatch_thread);
     // sleep
@@ -228,41 +224,44 @@ void mp2_yield_process(char *buf)
     schedule();
 }
 
-void mp2_unregister_process(char *buf)
-{
-    printk(KERN_ALERT "MP2 unregister process\n");
+/**
+ * function de-register process
+ *
+ * @param   *buf  buf contains process info
+ * @return  void
+ */
+void mp2_deregister_process(char *buf) {
+    printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS\n");
+
     pid_t pid;
-    rms_task_struct *tmp;
+    rms_task_struct *task;
 
-    sscanf(buf, "%u", &pid);
+    sscanf(buf, "%d", &pid);                    // get task pid from buf
 
-    // find and delete the task from rms_task_struct_list
-    mutex_lock_interruptible(&rms_task_list_mutex);
-    tmp = __get_task_by_pid(pid);
-    del_timer(&tmp->wakeup_timer);
-    list_del(&tmp->list);
-    mutex_unlock(&rms_task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex); // enter critical section
+    task = __get_task_by_pid(pid);              // find task from rms_task_struct_list
+    del_timer(&task->wakeup_timer);             // delete timer of the task
+    list_del(&task->list);                      // delete task from rms_task_struct_list
+    mutex_unlock(&task_list_mutex);             // exit critical section
 
-    // if the current_running_task is the deleting task, set current_running_task to NULL
-    mutex_lock_interruptible(&cur_rms_task_mutex);
-    if (current_running_task == tmp) {
-        current_running_task = NULL;
-        wake_up_process(dispatch_thread);
+    mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
+    if (cur_task == task) {                     // check if the cur task is the one to delete
+        cur_task = NULL;                        // set cur task to NULL
+        wake_up_process(dispatch_thread);       // wake up process
     }
-    mutex_unlock(&cur_rms_task_mutex);
+    mutex_unlock(&cur_task_mutex);              // exit critical section
 
-    // free cache
-    kmem_cache_free(mp2_task_struct_cache, tmp);
+    kmem_cache_free(mp2_task_struct_cache, task);   // free cache
 }
 
 /**
  * function to write /proc file
  *
- * @param *file     file to write
- * @param *buffer   user buffer
- * @param size      size of user buffer
- * @param *offl     offset in the file
- * @return size     number of byte written
+ * @param   *file   file to write
+ * @param   *buffer user buffer
+ * @param   size    size of user buffer
+ * @param   *offl   offset in the file
+ * @return  size    number of byte written
  */
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *loff) {
     unsigned long cpy_usr_byte;
@@ -270,36 +269,36 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
 
     // check the access of the buffer
     if (!access_ok(buffer, size)) {
-        printk(KERN_ALERT "Buffer is NOT READABLE\n");
+        printk(KERN_ALERT "[KERN_ALERT]: Buffer is NOT READABLE\n");
         return -EINVAL;
     }
 
     // allocate memory in kernel
     kbuf = (char *)kmalloc(size + 1, GFP_KERNEL);
     if (kbuf == NULL) {
-        printk(KERN_ALERT "Fail to allocate memory in kernel\n");
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate memory in kernel\n");
         return -ENOMEM;
     }
 
     cpy_usr_byte = copy_from_user(kbuf, buffer, size);
     if (cpy_usr_byte != 0) {
-        printk(KERN_ALERT "copy_from_user fail\n");
+        printk(KERN_ALERT "[KERN_ALERT]: copy_from_user fail\n");
     }
 
     kbuf[size] = '\0';     // null terminate kbuf
 
     switch (kbuf[0]) {
         case REGISTRATION:
-            mp2_register_processs(kbuf + 3);
+            mp2_register_process(kbuf + 3);
             break;
         case YIELD:
             mp2_yield_process(kbuf + 3);
             break;
         case DE_REGISTRATION:
-            mp2_unregister_process(kbuf + 3);
+            mp2_deregister_process(kbuf + 3);
             break;
         default:
-            printk(KERN_ALERT "Task Status Not Found\n");
+            printk(KERN_ALERT "[KERN_ALERT]: Task Status Not Found\n");
     }
 
     kfree(kbuf);
@@ -311,22 +310,22 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
  * called when mp2 module is loaded
  *
  * @param   void
- * @return  int 0-success, other-failed
+ * @return  int     0-success, other-failed
  */
 static int __init mp2_init(void) {
     #ifdef DEBUG
-    printk(KERN_ALERT "MP2 MODULE LOADING\n");
+    printk(KERN_ALERT "[KERN_ALERT]: MP2 MODULE LOADING\n");
     #endif
 
     // create /proc/mp2 dir
     if ((proc_dir = proc_mkdir(DIRECTORY, NULL)) == NULL) {
-        printk(KERN_ALERT "Fail to create /proc/" DIRECTORY "\n");
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "\n");
         return -ENOMEM;
     }
     // create /proc/mp2/status
     if ((proc_entry = proc_create(FILENAME, 0666, proc_dir, &proc_fops)) == NULL) {
         remove_proc_entry(DIRECTORY, NULL);
-        printk(KERN_ALERT "Fail to create /proc/" DIRECTORY "/" FILENAME "\n");
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "/" FILENAME "\n");
         return -ENOMEM;
     }
 
@@ -339,7 +338,7 @@ static int __init mp2_init(void) {
     // init and run the dispatching thread
     dispatch_thread = kthread_run(dispatch_thread_fn, NULL, "dispatch_thread");
 
-    printk(KERN_ALERT "MP2 MODULE LOADED\n");
+    printk(KERN_ALERT "[KERN_ALERT]: MP2 MODULE LOADED\n");
     return 0;
 }
 
@@ -353,13 +352,13 @@ static void __exit mp2_exit(void) {
     rms_task_struct *pos, *n;
 
     #ifdef DEBUG
-    printk(KERN_ALERT "MP2 MODULE UNLOADING\n");
+    printk(KERN_ALERT "[KERN_ALERT]: MP2 MODULE UNLOADING\n");
     #endif
 
     remove_proc_entry(FILENAME, proc_dir);  // remove /proc/mp2/status
     remove_proc_entry(DIRECTORY, NULL);     // remove /proc/mp2
-    mutex_destroy(&rms_task_list_mutex);    // destroy rms_task_list_mutex
-    mutex_destroy(&cur_rms_task_mutex);     // destroy cur_rms_task_mutex
+    mutex_destroy(&task_list_mutex);        // destroy task_list_mutex
+    mutex_destroy(&cur_task_mutex);         // destroy cur_task_mutex
 
     kthread_stop(dispatch_thread);          // stop the dispatching thread
 
@@ -371,7 +370,7 @@ static void __exit mp2_exit(void) {
 
     kmem_cache_destroy(mp2_task_struct_cache);          // destroy the mp2_task_struct_cache
 
-    printk(KERN_ALERT "MP2 MODULE UNLOADED\n");
+    printk(KERN_ALERT "[KERN_ALERT]: MP2 MODULE UNLOADED\n");
 }
 
 // Register init and exit functions

@@ -53,26 +53,22 @@ void timer_callback(struct timer_list *timer) {
  * @return rms_task_struct *ptr
  */
 rms_task_struct *get_highest_priority_ready_task(void) {
-    rms_task_struct *tmp, *result = NULL;
+    rms_task_struct *tmp, *task = NULL;
 
-    mutex_lock_interruptible(&task_list_mutex);
+    mutex_lock_interruptible(&task_list_mutex);     // enter critical section
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        // make sure the task's state is READY
-        if (tmp->state != READY) {
-            continue;
-        }
-        if (result == NULL) {
-            // find out first READY task in the list
-            result = tmp;
+        if (tmp->state != READY) continue;          // skip NOT READY tasks
+        if (task == NULL) {                         // find first READY task
+            task = tmp;
         } else {
-            if (result->period > tmp->period) {
-                result = tmp;
+            if (task->period > tmp->period) {       // replace READY task if higher priority
+                task = tmp;
             }
         }
     }
-    mutex_unlock(&task_list_mutex);
+    mutex_unlock(&task_list_mutex);                 // exit critical section
 
-    return result;
+    return task;
 }
 
 /**
@@ -84,45 +80,49 @@ rms_task_struct *get_highest_priority_ready_task(void) {
 void __set_priority(rms_task_struct *task, int policy, int priority) {
     // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
     struct sched_attr sa;
-    sa.sched_policy = policy;
-    sa.sched_priority = priority;
+    sa.sched_policy = policy;       // set task scheduling policy
+    sa.sched_priority = priority;   // set task scheduling priority
     // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/linux/sched.h#L1692
     sched_setattr_nocheck(task->linux_task, &sa);
 }
 
-static int dispatch_thread_fn(void *data)
-{
-    rms_task_struct *tmp;
+/**
+ * function that handle dispatch_thread
+ *
+ * @param arg   void ptr
+ * @return int  0-exit
+ */
+static int dispatch_thread_fn(void *arg) {
+    rms_task_struct *task;
 
     while (1) {
         // put dispatching thread to sleep
         set_current_state(TASK_INTERRUPTIBLE);
         schedule();
 
-        if (kthread_should_stop()) {
-            return 0;
-        }
+        if (kthread_should_stop()) return 0;
 
-        mutex_lock_interruptible(&cur_task_mutex);
-        if ((tmp = get_highest_priority_ready_task()) == NULL) {
-            // no READY task
+        mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
+        // no higher priority task
+        if ((task = get_highest_priority_ready_task()) == NULL) {
+            // lower cur_task priority
             if (cur_task != NULL) {
-                // lower the priority of the cur_task
                 __set_priority(cur_task, SCHED_NORMAL, 0);
             }
+        // exist higher priority task
         } else {
-            if (cur_task != NULL && tmp->period < cur_task->period) {
-                // preemption, set the cur_task to READY
+            // higher priority task preempt cur_task
+            if (cur_task != NULL && task->period < cur_task->period) {
                 cur_task->state = READY;
                 __set_priority(cur_task, SCHED_NORMAL, 0);
             }
-            // wake up tmp (highest priority READY task)
-            tmp->state = RUNNING;
-            wake_up_process(tmp->linux_task);
-            __set_priority(tmp, SCHED_FIFO, 99);
-            cur_task = tmp;
+            // wake up highest priority task
+            task->state = RUNNING;
+            wake_up_process(task->linux_task);
+            __set_priority(task, SCHED_FIFO, 99);
+            cur_task = task;
         }
-        mutex_unlock(&cur_task_mutex);
+        mutex_unlock(&cur_task_mutex);              // exit critical section
     }
 }
 

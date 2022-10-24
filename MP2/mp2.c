@@ -17,18 +17,22 @@ rms_task_struct *__get_task_by_pid(pid_t pid) {
     return NULL;                            // task not found, return NULL
 }
 
-void timer_callback(struct timer_list *timer)
-{
-    printk(KERN_ALERT "Timer callback\n");
-    unsigned long flags;
-    rms_task_struct *mp2TaskStruct;
-    spin_lock_irqsave(&lock, flags);
-    mp2TaskStruct = container_of(timer, rms_task_struct, wakeup_timer);
-    __get_task_by_pid(mp2TaskStruct->pid)->state = READY;
-    spin_unlock_irqrestore(&lock, flags);
+/**
+ * function that is invoked once after the timer elapses
+ *
+ * @param timer struct timer_list ptr
+ * @return void
+ */
+void timer_callback(struct timer_list *timer) {
+    printk(KERN_ALERT "[KERN_ALERT]: TIMER CALLBACK\n");
+    unsigned long flag;
+    rms_task_struct *task;
+    spin_lock_irqsave(&lock, flag);                             // enter critical section
+    task = container_of(timer, rms_task_struct, wakeup_timer);  // get the task
+    __get_task_by_pid(task->pid)->state = READY;                // set task->state to READY
+    spin_unlock_irqrestore(&lock, flag);                        // exit critical section
 
-    // wake up dispatching thread
-    wake_up_process(dispatch_thread);
+    wake_up_process(dispatch_thread);                           // wake up dispatch_thread
 }
 
 /**
@@ -70,6 +74,7 @@ rms_task_struct *get_highest_priority_ready_task(void) {
 void __set_priority(rms_task_struct *task, int policy, int priority) {
     // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
     struct sched_attr sa;
+    sa.sched_policy = policy;
     sa.sched_priority = priority;
     // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/linux/sched.h#L1692
     sched_setattr_nocheck(task->linux_task, &sa);
@@ -180,7 +185,7 @@ void mp2_register_process(char *buf) {
 
     INIT_LIST_HEAD(&(task->list));                          // init list
     sscanf(strsep(&buf, ","), "%d", &task->pid);            // set task->pid
-    printk(KERN_ALERT "REGISTER PROCESS WITH PID: %d\n", task->pid);
+    printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID: %d\n", task->pid);
     sscanf(strsep(&buf, ","), "%lu", &task->period);        // set task->period
     sscanf(strsep(&buf, "\n"), "%lu", &task->computation);  // set task->computation
     task->deadline = 0;                                     // set task->deadline

@@ -53,20 +53,22 @@ void timer_callback(struct timer_list *timer) {
  * @return rms_task_struct *ptr
  */
 rms_task_struct *get_highest_priority_ready_task(void) {
+    int mutex_ret;
     rms_task_struct *tmp, *task = NULL;
 
-    mutex_lock_interruptible(&task_list_mutex);     // enter critical section
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-locking/API-mutex-lock-interruptible.html
+    mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        if (tmp->state != READY) continue;          // skip NOT READY tasks
-        if (task == NULL) {                         // find first READY task
+        if (tmp->state != READY) continue;                  // skip NOT READY tasks
+        if (task == NULL) {                                 // find first READY task
             task = tmp;
         } else {
-            if (task->period > tmp->period) {       // replace READY task if higher priority
+            if (task->period > tmp->period) {               // replace READY task if higher priority
                 task = tmp;
             }
         }
     }
-    mutex_unlock(&task_list_mutex);                 // exit critical section
+    mutex_unlock(&task_list_mutex);                         // exit critical section
 
     return task;
 }
@@ -93,6 +95,7 @@ void __set_priority(rms_task_struct *task, int policy, int priority) {
  * @return int  0-exit
  */
 static int dispatch_thread_fn(void *arg) {
+    int mutex_ret;
     rms_task_struct *task;
 
     while (1) {
@@ -100,9 +103,9 @@ static int dispatch_thread_fn(void *arg) {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule();
 
-        if (kthread_should_stop()) return 0;        // stop kthread
+        if (kthread_should_stop()) return 0;                    // stop kthread
 
-        mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
+        mutex_ret = mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
         // no higher priority task
         if ((task = get_highest_priority_ready_task()) == NULL) {
             // lower cur_task priority
@@ -122,7 +125,7 @@ static int dispatch_thread_fn(void *arg) {
             __set_priority(task, SCHED_FIFO, 99);
             cur_task = task;
         }
-        mutex_unlock(&cur_task_mutex);              // exit critical section
+        mutex_unlock(&cur_task_mutex);                          // exit critical section
     }
 }
 
@@ -138,6 +141,7 @@ static int dispatch_thread_fn(void *arg) {
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *loff) {
     unsigned long cpy_kernel_byte;
     ssize_t byte_read = 0;
+    int mutex_ret;
     char *kbuf;
     rms_task_struct *task;
     if (*loff == 1) return 0;
@@ -154,13 +158,13 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     }
 
     // get all the task info in the list
-    mutex_lock_interruptible(&task_list_mutex);     // enter critical section
+    mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
     list_for_each_entry(task, &rms_task_struct_list, list) {
         byte_read += sprintf(kbuf + byte_read, "%d: %lu, %lu\n", task->pid, task->period, task->computation);
     }
-    mutex_unlock(&task_list_mutex);                 // exit critical section
+    mutex_unlock(&task_list_mutex);                         // exit critical section
 
-    kbuf[byte_read] = '\0';                         // null terminate kbuf
+    kbuf[byte_read] = '\0';                                 // null terminate kbuf
 
     cpy_kernel_byte = copy_to_user(buffer, kbuf, byte_read);
     if (cpy_kernel_byte != 0) {
@@ -181,21 +185,22 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
  * @return int          1-success   0-fail
  */
 int admission_ctrl(unsigned long computation, unsigned long period) {
+    int mutex_ret;
     unsigned long util_factor = 0;
     rms_task_struct *task;
 
     // sum up utilization of existing tasks
-    mutex_lock_interruptible(&task_list_mutex);     // enter critical section
+    mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
     list_for_each_entry(task, &rms_task_struct_list, list) {
         util_factor += (task->computation * MULTIPLIER) / task->period;
     }
-    mutex_unlock(&task_list_mutex);                 // exit critical section
+    mutex_unlock(&task_list_mutex);                         // exit critical section
 
     // add utilization of new task
     util_factor += (computation * MULTIPLIER) / period;
 
-    if(util_factor <= UTIL_BOUND) return 1;         // util_factor <= UB
-    return 0;                                       // unable to schedule new task
+    if(util_factor <= UTIL_BOUND) return 1;                 // util_factor <= UB
+    return 0;                                               // unable to schedule new task
 }
 
 /**
@@ -205,6 +210,7 @@ int admission_ctrl(unsigned long computation, unsigned long period) {
  * @return  void
  */
 void register_process(char *buf) {
+    int mutex_ret;
     rms_task_struct *task;
     rms_task_struct *tmp1;
 
@@ -225,7 +231,7 @@ void register_process(char *buf) {
         return;
     }
 
-    mutex_lock_interruptible(&task_list_mutex);             // enter critical section
+    mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
     list_add(&(task->list), &rms_task_struct_list);         // add task to rms_task_struct_list
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
         printk(KERN_ALERT "Hello %d %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
@@ -241,15 +247,16 @@ void register_process(char *buf) {
  */
 void yield_process(char *buf) {
     pid_t pid;
+    int mutex_ret;
     rms_task_struct *task;
     int wakeup;
 
-    sscanf(buf, "%d", &pid);                            // set task->pid
+    sscanf(buf, "%d", &pid);                                // set task->pid
     printk(KERN_ALERT "[KERN_ALERT]: YIELD PROCESS WITH PID: %d\n", pid);
 
-    mutex_lock_interruptible(&task_list_mutex);         // enter critical section
-    task = __get_task_by_pid(pid);                      // get the task struct
-    mutex_unlock(&task_list_mutex);                     // exit critical section
+    mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
+    task = __get_task_by_pid(pid);                          // get the task struct
+    mutex_unlock(&task_list_mutex);                         // exit critical section
 
     if (task->deadline == 0) {
         wakeup = 0;
@@ -257,19 +264,19 @@ void yield_process(char *buf) {
     } else {
         // update task->deadline
         task->deadline += msecs_to_jiffies(task->period);
-        // check if the task should wakeup
+        // check if the task should wake up
         wakeup = jiffies > task->deadline ? 1 : 0;
     }
 
     if (wakeup) return;
 
-    mod_timer(&(task->wakeup_timer), task->deadline);   // update timer with task->deadline
-    task->state = SLEEPING;                             // set task->state to SLEEPING
-    mutex_lock_interruptible(&cur_task_mutex);          // enter critical section
-    cur_task = NULL;                                    // reset cur_task to NULL
-    mutex_unlock(&cur_task_mutex);                      // exit critical section
-    wake_up_process(dispatch_thread);                   // wakeup scheduler
-    set_current_state(TASK_UNINTERRUPTIBLE);            // sleep
+    mod_timer(&(task->wakeup_timer), task->deadline);       // update timer with task->deadline
+    task->state = SLEEPING;                                 // set task->state to SLEEPING
+    mutex_ret = mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
+    cur_task = NULL;                                        // reset cur_task to NULL
+    mutex_unlock(&cur_task_mutex);                          // exit critical section
+    wake_up_process(dispatch_thread);                       // wake up scheduler
+    set_current_state(TASK_UNINTERRUPTIBLE);                // sleep
     schedule();
 }
 
@@ -281,25 +288,26 @@ void yield_process(char *buf) {
  */
 void deregister_process(char *buf) {
     pid_t pid;
+    int mutex_ret;
     rms_task_struct *task;
 
     sscanf(buf, "%d", &pid);                    // get task pid from buf
     printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS WITH PID: %d\n", pid);
 
-    mutex_lock_interruptible(&task_list_mutex); // enter critical section
-    task = __get_task_by_pid(pid);              // find task from rms_task_struct_list
-    del_timer(&task->wakeup_timer);             // delete timer of the task
-    list_del(&task->list);                      // delete task from rms_task_struct_list
-    mutex_unlock(&task_list_mutex);             // exit critical section
+    mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
+    task = __get_task_by_pid(pid);                          // find task from task_struct_list
+    del_timer(&task->wakeup_timer);                         // delete timer of the task
+    list_del(&task->list);                                  // delete task from task_struct_list
+    mutex_unlock(&task_list_mutex);                         // exit critical section
 
-    mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
-    if (cur_task == task) {                     // check if the cur task is the one to delete
-        cur_task = NULL;                        // set cur task to NULL
-        wake_up_process(dispatch_thread);       // wake up process
+    mutex_ret = mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
+    if (cur_task == task) {                                 // check if cur task is one to delete
+        cur_task = NULL;                                    // set cur task to NULL
+        wake_up_process(dispatch_thread);                   // wake up process
     }
-    mutex_unlock(&cur_task_mutex);              // exit critical section
+    mutex_unlock(&cur_task_mutex);                          // exit critical section
 
-    kmem_cache_free(rms_task_struct_cache, task);   // free cache
+    kmem_cache_free(rms_task_struct_cache, task);           // free cache
 }
 
 /**

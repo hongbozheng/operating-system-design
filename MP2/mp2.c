@@ -100,7 +100,7 @@ static int dispatch_thread_fn(void *arg) {
         set_current_state(TASK_INTERRUPTIBLE);
         schedule();
 
-        if (kthread_should_stop()) return 0;
+        if (kthread_should_stop()) return 0;        // stop kthread
 
         mutex_lock_interruptible(&cur_task_mutex);  // enter critical section
         // no higher priority task
@@ -162,22 +162,29 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, l
     return copied;
 }
 
-int admission_control(unsigned long computation, unsigned long period) {
+/**
+ * function that check if utilization factor > = < utilization bound
+ *
+ * @param computation   computation time of the task
+ * @param period        period of the task
+ * @return int          1-success   0-fail
+ */
+int admission_ctrl(unsigned long computation, unsigned long period) {
     unsigned long util_factor = 0;
     rms_task_struct *task;
 
-    // sum up the utilization of the existing tasks
-    mutex_lock_interruptible(&task_list_mutex);
+    // sum up utilization of existing tasks
+    mutex_lock_interruptible(&task_list_mutex);     // enter critical section
     list_for_each_entry(task, &rms_task_struct_list, list) {
         util_factor += (task->computation * MULTIPLIER) / task->period;
     }
-    mutex_unlock(&task_list_mutex);
+    mutex_unlock(&task_list_mutex);                 // exit critical section
 
-    // add the utilization of the new task
+    // add utilization of new task
     util_factor += (computation * MULTIPLIER) / period;
 
-    if(util_factor <= UTIL_BOUND) return 1;
-    return 0;
+    if(util_factor <= UTIL_BOUND) return 1;         // util_factor <= UB
+    return 0;                                       // unable to schedule new task
 }
 
 /**
@@ -186,7 +193,7 @@ int admission_control(unsigned long computation, unsigned long period) {
  * @param   buf
  * @return  void
  */
-void mp2_register_process(char *buf) {
+void register_process(char *buf) {
     rms_task_struct *task;
     rms_task_struct *tmp1;
 
@@ -203,7 +210,7 @@ void mp2_register_process(char *buf) {
     timer_setup(&(task->wakeup_timer), timer_callback, 0);  // set task->wakeup_timer
 
     // check for admission_control
-    if (!admission_control(task->computation, task->period)) {
+    if (!admission_ctrl(task->computation, task->period)) {
         return;
     }
 
@@ -221,7 +228,7 @@ void mp2_register_process(char *buf) {
  * @param buf buf contains process info
  * @return void
  */
-void mp2_yield_process(char *buf)
+void yield_process(char *buf)
 {
     printk(KERN_ALERT "MP2 Yield process\n");
     pid_t pid;
@@ -270,7 +277,7 @@ void mp2_yield_process(char *buf)
  * @param *buf  buf contains process info
  * @return void
  */
-void mp2_deregister_process(char *buf) {
+void deregister_process(char *buf) {
     printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS\n");
 
     pid_t pid;
@@ -329,13 +336,13 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
 
     switch (kbuf[0]) {
         case REGISTRATION:
-            mp2_register_process(kbuf + 3);
+            register_process(kbuf + 3);
             break;
         case YIELD:
-            mp2_yield_process(kbuf + 3);
+            yield_process(kbuf + 3);
             break;
         case DE_REGISTRATION:
-            mp2_deregister_process(kbuf + 3);
+            deregister_process(kbuf + 3);
             break;
         default:
             printk(KERN_ALERT "[KERN_ALERT]: Task Status Not Found\n");

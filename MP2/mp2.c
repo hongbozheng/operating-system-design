@@ -212,16 +212,15 @@ int admission_ctrl(unsigned long computation, unsigned long period) {
 void register_process(char *buf) {
     int mutex_ret;
     rms_task_struct *task;
-    rms_task_struct *tmp1;
 
     // allocate memory by cache for tmp
     task = (rms_task_struct *)kmem_cache_alloc(rms_task_struct_cache, GFP_KERNEL);
 
     INIT_LIST_HEAD(&(task->list));                          // init list
     sscanf(strsep(&buf, ","), "%d", &task->pid);            // set task->pid
-    printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID: %d\n", task->pid);
     sscanf(strsep(&buf, ","), "%lu", &task->period);        // set task->period
     sscanf(strsep(&buf, "\n"), "%lu", &task->computation);  // set task->computation
+    printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID: %d C: %lu P: %lu\n", task->pid, task->computation, task->period);
     task->deadline = 0;                                     // set task->deadline
     task->linux_task = find_task_by_pid(task->pid);         // set task->linux_task
     timer_setup(&(task->wakeup_timer), timer_callback, 0);  // set task->wakeup_timer
@@ -233,9 +232,6 @@ void register_process(char *buf) {
 
     mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
     list_add(&(task->list), &rms_task_struct_list);         // add task to rms_task_struct_list
-    list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
-        printk(KERN_ALERT "Hello %d %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
-    }
     mutex_unlock(&task_list_mutex);                         // exit critical section
 }
 
@@ -343,13 +339,13 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
 
     switch (kbuf[0]) {
         case REGISTRATION:                          // register process
-            register_process(kbuf+3);
+            register_process(kbuf+PID_OFFSET);
             break;
         case YIELD:                                 // yield process
-            yield_process(kbuf+3);
+            yield_process(kbuf+PID_OFFSET);
             break;
         case DE_REGISTRATION:                       // de-register process
-            deregister_process(kbuf+3);
+            deregister_process(kbuf+PID_OFFSET);
             break;
         default:
             printk(KERN_ALERT "[KERN_ALERT]: Task Status Not Found\n");

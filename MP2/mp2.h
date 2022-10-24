@@ -34,6 +34,7 @@ MODULE_DESCRIPTION("CS-423 MP2");
 #define RUNNING         3
 #define UTIL_BOUND      69300
 #define MULTIPLIER      100000
+#define PID_OFFSET      3
 
 LIST_HEAD(rms_task_struct_list);
 DEFINE_MUTEX(task_list_mutex);

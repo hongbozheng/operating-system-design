@@ -113,7 +113,7 @@ int main(int argc, char* argv[]) {
     sscanf(argv[1],"%lu",&period);                  // get task period
     sscanf(argv[2],"%lu",&computation);             // get task computation time
 
-    printf("[USRAPP]: REGISTER TASK PID: %d, C: %lu, P: %lu, F: %u\n", pid, computation, period, freq);
+    printf("[USRAPP]: REGISTER TASK PID: %d C: %lu P: %lu F: %u\n", pid, computation, period, freq);
     // register process through /proc/mp2/status
     register_process(pid, period, computation);
 
@@ -128,8 +128,10 @@ int main(int argc, char* argv[]) {
     printf("[USRAPP]: TASK START TIME %ld\n", t0.tv_sec);
 
     // write yield to /proc/mp2/status
+    printf("[USRAPP]: YIELD PROCESS WITH PID %d\n", pid);
     yield_process(pid);
 
+    printf("[USRAPP]: START EXECUTION\n");
     // real-time loop, simulate periodic application
     for (int i = 0; i < freq; ++i) {
         printf("--------------------------------------------------\n");
@@ -140,7 +142,7 @@ int main(int argc, char* argv[]) {
         printf("[USRAPP]: YIELD PROCESS WITH PID %d\n", pid);
         yield_process(pid);
     }
-
+    printf("--------------------------------------------------\n");
     printf("[USRAPP]: DEREGISTER PROCESS WITH PID %d\n", pid);
     deregister_process(pid);
 

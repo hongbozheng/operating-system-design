@@ -1,3 +1,13 @@
+/**
+ * FILENAME: mp2.h
+ *
+ * DESCRIPTION: mp2 kernel module header file
+ *
+ * AUTHOR: Hongbo Zheng
+ *
+ * DATE: Sunday Oct 23th, 2022
+ */
+
 #ifndef __MP2_H__
 #define __MP2_H__
 
@@ -33,14 +43,11 @@ typedef struct rms_task_struct{
     struct task_struct *linux_task;
     struct timer_list wakeup_timer;
     struct list_head list;
-
-    // milliseconds
     pid_t pid;
-    unsigned long period;
-    unsigned long computation;
+    unsigned long period;           // ms
+    unsigned long computation;      // ms
+    unsigned long deadline;         // jiffies
     unsigned int state;
-    // jiffies
-    unsigned long deadline;
 } rms_task_struct;
 
 static spinlock_t lock;

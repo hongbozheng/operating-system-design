@@ -1,3 +1,13 @@
+/**
+ * FILENAME: mp2.c
+ *
+ * DESCRIPTION: mp2 kernel module file
+ *
+ * AUTHOR: Hongbo Zheng
+ *
+ * DATE: Sunday Oct 23th, 2022
+ */
+
 #define LINUX
 
 #include "mp2.h"

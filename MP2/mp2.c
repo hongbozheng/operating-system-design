@@ -239,46 +239,37 @@ void register_process(char *buf) {
  * @param buf buf contains process info
  * @return void
  */
-void yield_process(char *buf)
-{
+void yield_process(char *buf) {
     pid_t pid;
-    rms_task_struct *tmp;
-    int should_skip;
-    printk(KERN_ALERT "MP2 Yield process\n");
+    rms_task_struct *task;
+    int wakeup;
 
-    // set task to tmp
-    sscanf(buf, "%u", &pid);
-    mutex_lock_interruptible(&task_list_mutex);
-    tmp = __get_task_by_pid(pid);
-    mutex_unlock(&task_list_mutex);
+    sscanf(buf, "%d", &pid);                            // set task->pid
+    printk(KERN_ALERT "[KERN_ALERT]: YIELD PROCESS WITH PID: %d\n", pid);
 
-    if (tmp->deadline == 0) {
-        // initial deadline when the task first time yield
-        should_skip = 0;
-        tmp->deadline = jiffies + msecs_to_jiffies(tmp->period);
+    mutex_lock_interruptible(&task_list_mutex);         // enter critical section
+    task = __get_task_by_pid(pid);                      // get the task struct
+    mutex_unlock(&task_list_mutex);                     // exit critical section
+
+    if (task->deadline == 0) {
+        wakeup = 0;
+        task->deadline = jiffies + msecs_to_jiffies(task->period);
     } else {
-        // update deadline
-        tmp->deadline += msecs_to_jiffies(tmp->period);
-        // check if the task should skip sleeping
-        should_skip = jiffies > tmp->deadline ? 1 : 0;
+        // update task->deadline
+        task->deadline += msecs_to_jiffies(task->period);
+        // check if the task should wakeup
+        wakeup = jiffies > task->deadline ? 1 : 0;
     }
 
-    if (should_skip) {
-        return;
-    }
+    if (wakeup) return;
 
-    // update timer
-    mod_timer(&(tmp->wakeup_timer), tmp->deadline);
-    // set state to SLEEPING
-    tmp->state = SLEEPING;
-    // reset cur_task to NULL
-    mutex_lock_interruptible(&cur_task_mutex);
-    cur_task = NULL;
-    mutex_unlock(&cur_task_mutex);
-    // wake up scheduler
-    wake_up_process(dispatch_thread);
-    // sleep
-    set_current_state(TASK_UNINTERRUPTIBLE);
+    mod_timer(&(task->wakeup_timer), task->deadline);   // update timer with task->deadline
+    task->state = SLEEPING;                             // set task->state to SLEEPING
+    mutex_lock_interruptible(&cur_task_mutex);          // enter critical section
+    cur_task = NULL;                                    // reset cur_task to NULL
+    mutex_unlock(&cur_task_mutex);                      // exit critical section
+    wake_up_process(dispatch_thread);                   // wakeup scheduler
+    set_current_state(TASK_UNINTERRUPTIBLE);            // sleep
     schedule();
 }
 
@@ -291,9 +282,9 @@ void yield_process(char *buf)
 void deregister_process(char *buf) {
     pid_t pid;
     rms_task_struct *task;
-    printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS\n");
 
     sscanf(buf, "%d", &pid);                    // get task pid from buf
+    printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS WITH PID: %d\n", pid);
 
     mutex_lock_interruptible(&task_list_mutex); // enter critical section
     task = __get_task_by_pid(pid);              // find task from rms_task_struct_list

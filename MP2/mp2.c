@@ -50,32 +50,18 @@ rms_task_struct *get_highest_priority_ready_task(void)
     return result;
 }
 
-int admission_control(unsigned long computation, unsigned long period) {
-    unsigned long util_factor = 0;
-    rms_task_struct *tmp;
-
-    // accumulate all tasks' ratio already in the list
-    mutex_lock_interruptible(&task_list_mutex);
-    list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        util_factor += (tmp->computation * MULTIPLIER) / tmp->period;
-    }
-    mutex_unlock(&task_list_mutex);
-
-    // add the ratio of the new task
-    util_factor += (computation * MULTIPLIER) / period;
-
-    if(util_factor <= UTIL_BOUND) return 1;
-    return 0;
-}
-
-void __set_priority(rms_task_struct *task, int policy, int priority)
-{
-    // https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
-    struct sched_attr sattr;
-    sattr.sched_policy = policy;
-    sattr.sched_priority = priority;
-    //https://elixir.free-electrons.com/linux/v5.10.16/source/include/linux/sched.h#L1692
-    sched_setattr_nocheck(task->linux_task, &sattr);
+/**
+ * function that set task priority
+ *
+ * @param task      task that needs to set priority
+ * @param priority  task priority
+ */
+void __set_priority(rms_task_struct *task, int policy, int priority) {
+    // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
+    struct sched_attr sa;
+    sa.sched_priority = priority;
+    // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/linux/sched.h#L1692
+    sched_setattr_nocheck(task->linux_task, &sa);
 }
 
 static int dispatch_thread_fn(void *data)
@@ -148,6 +134,24 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, l
 
     *data = 1;
     return copied;
+}
+
+int admission_control(unsigned long computation, unsigned long period) {
+    unsigned long util_factor = 0;
+    rms_task_struct *task;
+
+    // sum up the utilization of the existing tasks
+    mutex_lock_interruptible(&task_list_mutex);
+    list_for_each_entry(task, &rms_task_struct_list, list) {
+        util_factor += (task->computation * MULTIPLIER) / task->period;
+    }
+    mutex_unlock(&task_list_mutex);
+
+    // add the utilization of the new task
+    util_factor += (computation * MULTIPLIER) / period;
+
+    if(util_factor <= UTIL_BOUND) return 1;
+    return 0;
 }
 
 /**

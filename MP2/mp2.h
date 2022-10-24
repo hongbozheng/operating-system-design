@@ -53,6 +53,6 @@ static const struct proc_ops proc_fops = {
 };
 static struct task_struct *dispatch_thread;
 static rms_task_struct *cur_task = NULL;
-static struct kmem_cache *mp2_task_struct_cache;
+static struct kmem_cache *rms_task_struct_cache;
 
 #endif

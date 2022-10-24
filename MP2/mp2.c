@@ -114,8 +114,16 @@ static int dispatch_thread_fn(void *data)
     }
 }
 
-static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, loff_t *data)
-{
+/**
+ * function to read /proc file
+ *
+ * @param *file     file to read
+ * @param *buffer   user buffer
+ * @param size      size of user buffer
+ * @param *offl     offset in the file
+ * @return ssize_t  number of byte copied
+ */
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, loff_t *data) {
     if (*data == 1) {
         return 0;
     }
@@ -142,44 +150,47 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, l
     return copied;
 }
 
-void mp2_register_process(char *buf)
-{
-    printk(KERN_ALERT "MP2 register process\n");
-    rms_task_struct *tmp;
+/**
+ * function that register process
+ *
+ * @param   buf
+ * @return  void
+ */
+void mp2_register_process(char *buf) {
+    rms_task_struct *task;
     rms_task_struct *tmp1;
 
     // allocate memory by cache for tmp
-    tmp = (rms_task_struct *)kmem_cache_alloc(mp2_task_struct_cache, GFP_KERNEL);
+    task = (rms_task_struct *)kmem_cache_alloc(rms_task_struct_cache, GFP_KERNEL);
 
-    // initialize list
-    INIT_LIST_HEAD(&(tmp->list));
-    // set pid
-    sscanf(strsep(&buf, ","), "%d", &tmp->pid);
-    // set period
-    sscanf(strsep(&buf, ","), "%lu", &tmp->period);
-    // set computation
-    sscanf(strsep(&buf, "\n"), "%lu", &tmp->computation);
-    // set deadline
-    tmp->deadline = 0;
-    // set linux_task
-    tmp->linux_task = find_task_by_pid(tmp->pid);
-    // set wakeup_timer
-    timer_setup(&(tmp->wakeup_timer), timer_callback, 0);
+    INIT_LIST_HEAD(&(task->list));                          // init list
+    sscanf(strsep(&buf, ","), "%d", &task->pid);            // set task->pid
+    printk(KERN_ALERT "REGISTER PROCESS WITH PID: %d\n", task->pid);
+    sscanf(strsep(&buf, ","), "%lu", &task->period);        // set task->period
+    sscanf(strsep(&buf, "\n"), "%lu", &task->computation);  // set task->computation
+    task->deadline = 0;                                     // set task->deadline
+    task->linux_task = find_task_by_pid(task->pid);         // set task->linux_task
+    timer_setup(&(task->wakeup_timer), timer_callback, 0);  // set task->wakeup_timer
 
     // check for admission_control
-    if (!admission_control(tmp->computation, tmp->period)) {
+    if (!admission_control(task->computation, task->period)) {
         return;
     }
 
-    // add task to rms_task_struct_list
-    mutex_lock_interruptible(&task_list_mutex);
-    list_add(&(tmp->list), &rms_task_struct_list);
+    mutex_lock_interruptible(&task_list_mutex);             // enter critical section
+    list_add(&(task->list), &rms_task_struct_list);         // add task to rms_task_struct_list
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
         printk(KERN_ALERT "Hello %d %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
     }
-    mutex_unlock(&task_list_mutex);
+    mutex_unlock(&task_list_mutex);                         // exit critical section
 }
 
+/**
+ * function that yield process
+ *
+ * @param buf buf contains process info
+ * @return void
+ */
 void mp2_yield_process(char *buf)
 {
     printk(KERN_ALERT "MP2 Yield process\n");
@@ -219,16 +230,15 @@ void mp2_yield_process(char *buf)
     // wake up scheduler
     wake_up_process(dispatch_thread);
     // sleep
-    //set_task_state(tmp->linux_task, TASK_UNINTERRUPTIBLE);
     set_current_state(TASK_UNINTERRUPTIBLE);
     schedule();
 }
 
 /**
- * function de-register process
+ * function that de-register process
  *
- * @param   *buf  buf contains process info
- * @return  void
+ * @param *buf  buf contains process info
+ * @return void
  */
 void mp2_deregister_process(char *buf) {
     printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS\n");
@@ -251,17 +261,17 @@ void mp2_deregister_process(char *buf) {
     }
     mutex_unlock(&cur_task_mutex);              // exit critical section
 
-    kmem_cache_free(mp2_task_struct_cache, task);   // free cache
+    kmem_cache_free(rms_task_struct_cache, task);   // free cache
 }
 
 /**
  * function to write /proc file
  *
- * @param   *file   file to write
- * @param   *buffer user buffer
- * @param   size    size of user buffer
- * @param   *offl   offset in the file
- * @return  size    number of byte written
+ * @param *file     file to write
+ * @param *buffer   user buffer
+ * @param size      size of user buffer
+ * @param *offl     offset in the file
+ * @return size     number of byte written
  */
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *loff) {
     unsigned long cpy_usr_byte;
@@ -309,8 +319,8 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
 /**
  * called when mp2 module is loaded
  *
- * @param   void
- * @return  int     0-success, other-failed
+ * @param void
+ * @return int  0-success, other-failed
  */
 static int __init mp2_init(void) {
     #ifdef DEBUG
@@ -333,7 +343,7 @@ static int __init mp2_init(void) {
     spin_lock_init(&lock);
 
     // create cache
-    mp2_task_struct_cache = KMEM_CACHE(rms_task_struct , SLAB_PANIC);
+    rms_task_struct_cache = KMEM_CACHE(rms_task_struct , SLAB_PANIC);
 
     // init and run the dispatching thread
     dispatch_thread = kthread_run(dispatch_thread_fn, NULL, "dispatch_thread");
@@ -345,8 +355,8 @@ static int __init mp2_init(void) {
 /**
  * called when mp2 module is unloaded
  *
- * @param   void
- * @return  void
+ * @param void
+ * @return void
  */
 static void __exit mp2_exit(void) {
     rms_task_struct *pos, *n;
@@ -365,10 +375,10 @@ static void __exit mp2_exit(void) {
     // free rms_task_struct_list
     list_for_each_entry_safe(pos, n, &rms_task_struct_list, list) {
         list_del(&pos->list);                           // delete rms_task_struct_list
-        kmem_cache_free(mp2_task_struct_cache, pos);    // free rms_task_struct_list
+        kmem_cache_free(rms_task_struct_cache, pos);    // free rms_task_struct_list
     }
 
-    kmem_cache_destroy(mp2_task_struct_cache);          // destroy the mp2_task_struct_cache
+    kmem_cache_destroy(rms_task_struct_cache);          // destroy the rms_task_struct_cache
 
     printk(KERN_ALERT "[KERN_ALERT]: MP2 MODULE UNLOADED\n");
 }

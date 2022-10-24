@@ -24,6 +24,8 @@ MODULE_DESCRIPTION("CS-423 MP2");
 #define RUNNING          3
 
 LIST_HEAD(rms_task_struct_list);
+DEFINE_MUTEX(struct_list_mutex);
+DEFINE_MUTEX(cur_running_task_mutex);
 
 typedef struct rms_task_struct{
     struct task_struct *linux_task;
@@ -31,12 +33,18 @@ typedef struct rms_task_struct{
     struct list_head list;
 
     // milliseconds
-    unsigned int pid;
-    unsigned int period;
-    unsigned int computation;
+    pid_t pid;
+    unsigned long period;
+    unsigned long computation;
     unsigned int state;
     // jiffies
     unsigned long deadline;
 } rms_task_struct;
+
+static spinlock_t lock;
+static struct proc_dir_entry *proc_dir, *proc_entry;
+static struct task_struct *dispatch_thread;
+static rms_task_struct *current_running_task = NULL;
+static struct kmem_cache *mp2_task_struct_cache;
 
 #endif

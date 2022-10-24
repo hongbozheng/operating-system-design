@@ -2,37 +2,13 @@
 
 #include "mp2.h"
 
-struct mp2_task_struct {
-    struct task_struct *linux_task;
-    struct timer_list wakeup_timer;
-    struct list_head list;
 
-    // milliseconds
-    unsigned int pid;
-    unsigned int period;
-    unsigned int computation;
-    unsigned int state;
-    // jiffies
-    unsigned long deadline;
-};
-
-int task_len = 0;
-
-static struct proc_dir_entry *proc_dir, *proc_entry;
-
-DEFINE_MUTEX(struct_list_mutex);
-DEFINE_MUTEX(cur_running_task_mutex);
-static spinlock_t lock;
-static struct task_struct *dispatch_thread;
-static rms_task_struct *current_running_task = NULL;
-static struct kmem_cache *mp2_task_struct_cache;
-
-rms_task_struct *__get_task_by_pid(unsigned int pid)
+rms_task_struct *__get_task_by_pid(pid_t pid)
 {
-    rms_task_struct *tmp;
-    list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        if (tmp->pid == pid) {
-            return tmp;
+    rms_task_struct *task;
+    list_for_each_entry(task, &rms_task_struct_list, list) {
+        if (task->pid == pid) {
+            return task;
         }
     }
     // if no task with such pid, then return NULL
@@ -212,7 +188,7 @@ void mp2_register_processs(char *buf)
     mutex_lock_interruptible(&struct_list_mutex);
     list_add(&(tmp->list), &rms_task_struct_list);
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
-        printk(KERN_ALERT "Hello %d %d %d\n", tmp1->pid, tmp1->period, tmp1->computation);
+        printk(KERN_ALERT "Hello %ld %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
     }
     mutex_unlock(&struct_list_mutex);
 }
@@ -220,7 +196,7 @@ void mp2_register_processs(char *buf)
 void mp2_yield_process(char *buf)
 {
     printk(KERN_ALERT "MP2 Yield process\n");
-    unsigned int pid;
+    pid_t pid;
     rms_task_struct *tmp;
     int should_skip;
 
@@ -264,7 +240,7 @@ void mp2_yield_process(char *buf)
 void mp2_unregister_process(char *buf)
 {
     printk(KERN_ALERT "MP2 unregister process\n");
-    unsigned int pid;
+    pid_t pid;
     rms_task_struct *tmp;
 
     sscanf(buf, "%u", &pid);

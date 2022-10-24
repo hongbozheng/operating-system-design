@@ -77,7 +77,7 @@ int is_process_exist(unsigned int pid)
 //    return 0;
 }
 
-void register_process(unsigned int pid, int period, int computation)
+void register_process(unsigned int pid, unsigned long period, unsigned long computation)
 {
     FILE *f;
     f= fopen("/proc/mp2/status","w");
@@ -86,7 +86,8 @@ void register_process(unsigned int pid, int period, int computation)
     //sprintf(command, "echo \"R, %u, %s, %s\" > /proc/%s/%s", pid, period, computation, DIRECTORY, FILENAME);
 //    int p = atoi(&period);
 //    int c = atoi(&computation);
-    fprintf(f,"R, %d, %d, %d", pid, period, computation);
+    fprintf(f,"R, %d, %lu, %lu", pid, period, computation);
+    printf("R, %d, %lu, %lu\n", pid, period, computation);
     fclose(f);
     //printf("register process success\n");
 }

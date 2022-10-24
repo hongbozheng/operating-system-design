@@ -17,9 +17,14 @@ int main(int argc, char* argv[])
         puts("error in argc");
         return 1;
     }
+    unsigned long period, computation;
+    sscanf(argv[1],"%lu",&period);
+    sscanf(argv[2],"%lu",&computation);
+
+    printf("INFO: period: %lu computation: %lu\n", period, computation);
 
     // register process through /proc/mp2/status
-    register_process(pid, atoi(argv[1]), atoi(argv[2]));
+    register_process(pid, period, computation);
     //printf("Register process %d\n", pid);
     // read /proc/mp2/status and check if the process registered successfully
     if (!is_process_exist(pid)) {

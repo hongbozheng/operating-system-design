@@ -30,7 +30,7 @@ rms_task_struct *get_highest_priority_ready_task(void)
 {
     rms_task_struct *tmp, *result = NULL;
 
-    mutex_lock_interruptible(&mutex);
+    mutex_lock_interruptible(&rms_task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         // make sure the task's state is READY
         if (tmp->state != READY) {
@@ -45,7 +45,7 @@ rms_task_struct *get_highest_priority_ready_task(void)
             }
         }
     }
-    mutex_unlock(&mutex);
+    mutex_unlock(&rms_task_list_mutex);
 
     return result;
 }
@@ -55,11 +55,11 @@ int admission_control(unsigned long computation, unsigned long period) {
     rms_task_struct *tmp;
 
     // accumulate all tasks' ratio already in the list
-    mutex_lock_interruptible(&mutex);
+    mutex_lock_interruptible(&rms_task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         util_factor += (tmp->computation * MULTIPLIER) / tmp->period;
     }
-    mutex_unlock(&mutex);
+    mutex_unlock(&rms_task_list_mutex);
 
     // add the ratio of the new task
     util_factor += (computation * MULTIPLIER) / period;
@@ -94,7 +94,7 @@ static int dispatch_thread_fn(void *data)
             return 0;
         }
 
-        mutex_lock_interruptible(&cur_running_task_mutex);
+        mutex_lock_interruptible(&cur_rms_task_mutex);
         if ((tmp = get_highest_priority_ready_task()) == NULL) {
             // no READY task
             if (current_running_task != NULL) {
@@ -113,7 +113,7 @@ static int dispatch_thread_fn(void *data)
             __set_priority(tmp, SCHED_FIFO, 99);
             current_running_task = tmp;
         }
-        mutex_unlock(&cur_running_task_mutex);
+        mutex_unlock(&cur_rms_task_mutex);
     }
 }
 
@@ -129,11 +129,11 @@ static ssize_t mp2_read(struct file *file, char __user *buffer, size_t count, lo
     buf = (char *)kmalloc(count, GFP_KERNEL);
 
     // loop through the tasks in the list
-    mutex_lock_interruptible(&mutex);
+    mutex_lock_interruptible(&rms_task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         copied += sprintf(buf + copied, "%u: %u, %u\n", tmp->pid, tmp->period, tmp->computation);
     }
-    mutex_unlock(&mutex);
+    mutex_unlock(&rms_task_list_mutex);
 
     buf[copied] = '\0';
 
@@ -176,12 +176,12 @@ void mp2_register_processs(char *buf)
     }
 
     // add task to rms_task_struct_list
-    mutex_lock_interruptible(&mutex);
+    mutex_lock_interruptible(&rms_task_list_mutex);
     list_add(&(tmp->list), &rms_task_struct_list);
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
         printk(KERN_ALERT "Hello %ld %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
     }
-    mutex_unlock(&mutex);
+    mutex_unlock(&rms_task_list_mutex);
 }
 
 void mp2_yield_process(char *buf)
@@ -193,9 +193,9 @@ void mp2_yield_process(char *buf)
 
     // set task to tmp
     sscanf(buf, "%u", &pid);
-    mutex_lock_interruptible(&mutex);
+    mutex_lock_interruptible(&rms_task_list_mutex);
     tmp = __get_task_by_pid(pid);
-    mutex_unlock(&mutex);
+    mutex_unlock(&rms_task_list_mutex);
 
     if (tmp->deadline == 0) {
         // initial deadline when the task first time yield
@@ -217,9 +217,9 @@ void mp2_yield_process(char *buf)
     // set state to SLEEPING
     tmp->state = SLEEPING;
     // reset current_running_task to NULL
-    mutex_lock_interruptible(&cur_running_task_mutex);
+    mutex_lock_interruptible(&cur_rms_task_mutex);
     current_running_task = NULL;
-    mutex_unlock(&cur_running_task_mutex);
+    mutex_unlock(&cur_rms_task_mutex);
     // wake up scheduler
     wake_up_process(dispatch_thread);
     // sleep
@@ -237,19 +237,19 @@ void mp2_unregister_process(char *buf)
     sscanf(buf, "%u", &pid);
 
     // find and delete the task from rms_task_struct_list
-    mutex_lock_interruptible(&mutex);
+    mutex_lock_interruptible(&rms_task_list_mutex);
     tmp = __get_task_by_pid(pid);
     del_timer(&tmp->wakeup_timer);
     list_del(&tmp->list);
-    mutex_unlock(&mutex);
+    mutex_unlock(&rms_task_list_mutex);
 
     // if the current_running_task is the deleting task, set current_running_task to NULL
-    mutex_lock_interruptible(&cur_running_task_mutex);
+    mutex_lock_interruptible(&cur_rms_task_mutex);
     if (current_running_task == tmp) {
         current_running_task = NULL;
         wake_up_process(dispatch_thread);
     }
-    mutex_unlock(&cur_running_task_mutex);
+    mutex_unlock(&cur_rms_task_mutex);
 
     // free cache
     kmem_cache_free(mp2_task_struct_cache, tmp);
@@ -283,21 +283,20 @@ static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t co
 }
 
 // mp2_init - Called when module is loaded
-static int __init mp2_init(void)
-{
+static int __init mp2_init(void) {
     #ifdef DEBUG
     printk(KERN_ALERT "MP2 MODULE LOADING\n");
     #endif
 
-    // create /proc/mp2
+    // create /proc/mp2 dir
     if ((proc_dir = proc_mkdir(DIRECTORY, NULL)) == NULL) {
-        printk(KERN_INFO "proc_mkdir ERROR\n");
+        printk(KERN_ALERT "Fail to create /proc/" DIRECTORY "\n");
         return -ENOMEM;
     }
     // create /proc/mp2/status
-    if ((proc_entry = proc_create(FILENAME, 0666, proc_dir, &mp2_fops)) == NULL) {
+    if ((proc_entry = proc_create(FILENAME, 0666, proc_dir, &proc_fops)) == NULL) {
         remove_proc_entry(DIRECTORY, NULL);
-        printk(KERN_INFO "proc_create ERROR\n");
+        printk(KERN_ALERT "Fail to create /proc/" DIRECTORY "/" FILENAME "\n");
         return -ENOMEM;
     }
 
@@ -315,38 +314,31 @@ static int __init mp2_init(void)
 }
 
 // mp1_exit - Called when module is unloaded
-static void __exit mp2_exit(void)
-{
+static void __exit mp2_exit(void) {
     rms_task_struct *pos, *n;
 
     #ifdef DEBUG
     printk(KERN_ALERT "MP2 MODULE UNLOADING\n");
     #endif
 
-    // remove /proc/mp1/status
-    remove_proc_entry(FILENAME, proc_dir);
-    // remove /proc/mp1
-    remove_proc_entry(DIRECTORY, NULL);
+    remove_proc_entry(FILENAME, proc_dir);  // remove /proc/mp2/status
+    remove_proc_entry(DIRECTORY, NULL);     // remove /proc/mp2
+    mutex_destroy(&rms_task_list_mutex);    // destroy rms_task_list_mutex
+    mutex_destroy(&cur_rms_task_mutex);     // destroy cur_rms_task_mutex
 
-    // destroy all mutexes
-    mutex_destroy(&mutex);
-    mutex_destroy(&cur_running_task_mutex);
+    kthread_stop(dispatch_thread);          // stop the dispatching thread
 
-    // stop the dispatching thread
-    kthread_stop(dispatch_thread);
-
-    // free mp1_proc_list
+    // free rms_task_struct_list
     list_for_each_entry_safe(pos, n, &rms_task_struct_list, list) {
-        list_del(&pos->list);
-        kmem_cache_free(mp2_task_struct_cache, pos);
+        list_del(&pos->list);                           // delete rms_task_struct_list
+        kmem_cache_free(mp2_task_struct_cache, pos);    // free rms_task_struct_list
     }
 
-    // destroy the cache
-    kmem_cache_destroy(mp2_task_struct_cache);
+    kmem_cache_destroy(mp2_task_struct_cache);          // destroy the mp2_task_struct_cache
 
     printk(KERN_ALERT "MP2 MODULE UNLOADED\n");
 }
 
-// Register init and exit funtions
+// Register init and exit functions
 module_init(mp2_init);
 module_exit(mp2_exit);

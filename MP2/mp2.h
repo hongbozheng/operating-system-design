@@ -26,8 +26,8 @@ MODULE_DESCRIPTION("CS-423 MP2");
 #define MULTIPLIER      100000
 
 LIST_HEAD(rms_task_struct_list);
-DEFINE_MUTEX(mutex);
-DEFINE_MUTEX(cur_running_task_mutex);
+DEFINE_MUTEX(rms_task_list_mutex);
+DEFINE_MUTEX(cur_rms_task_mutex);
 
 typedef struct rms_task_struct{
     struct task_struct *linux_task;
@@ -47,7 +47,7 @@ static spinlock_t lock;
 static struct proc_dir_entry *proc_dir, *proc_entry;
 static ssize_t mp2_read(struct file *file, char __user *buffer, size_t count, loff_t *data);
 static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t count, loff_t *data);
-static const struct proc_ops mp2_fops = {
+static const struct proc_ops proc_fops = {
         .proc_read    = mp2_read,
         .proc_write   = mp2_write
 };

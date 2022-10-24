@@ -141,9 +141,13 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     char *kbuf;
     rms_task_struct *task;
     if (*loff == 1) return 0;
-    
-    // allocate memory in kernel
-    kbuf = (char *)kmalloc(size, GFP_KERNEL);
+
+    if (!access_ok(buffer, size)) {                 // check the access of the buffer
+        printk(KERN_ALERT "[KERN_ALERT]: User Buffer is NOT WRITABLE\n");
+        return -EINVAL;
+    }
+
+    kbuf = (char *)kmalloc(size, GFP_KERNEL);       // allocate memory in kernel
     if (kbuf == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate memory in kernel\n");
         return -ENOMEM;
@@ -320,14 +324,12 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
     unsigned long cpy_usr_byte;
     char *kbuf;
 
-    // check the access of the buffer
-    if (!access_ok(buffer, size)) {
+    if (!access_ok(buffer, size)) {                 // check the access of the buffer
         printk(KERN_ALERT "[KERN_ALERT]: Buffer is NOT READABLE\n");
         return -EINVAL;
     }
 
-    // allocate memory in kernel
-    kbuf = (char *)kmalloc(size + 1, GFP_KERNEL);
+    kbuf = (char *)kmalloc(size+1, GFP_KERNEL);     // allocate memory in kernel
     if (kbuf == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate memory in kernel\n");
         return -ENOMEM;
@@ -338,17 +340,17 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
         printk(KERN_ALERT "[KERN_ALERT]: copy_from_user fail\n");
     }
 
-    kbuf[size] = '\0';     // null terminate kbuf
+    kbuf[size] = '\0';                              // null terminate kbuf
 
     switch (kbuf[0]) {
-        case REGISTRATION:
-            register_process(kbuf + 3);
+        case REGISTRATION:                          // register process
+            register_process(kbuf+3);
             break;
-        case YIELD:
-            yield_process(kbuf + 3);
+        case YIELD:                                 // yield process
+            yield_process(kbuf+3);
             break;
-        case DE_REGISTRATION:
-            deregister_process(kbuf + 3);
+        case DE_REGISTRATION:                       // de-register process
+            deregister_process(kbuf+3);
             break;
         default:
             printk(KERN_ALERT "[KERN_ALERT]: Task Status Not Found\n");

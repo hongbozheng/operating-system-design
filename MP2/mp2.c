@@ -131,7 +131,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, l
     // loop through the tasks in the list
     mutex_lock_interruptible(&rms_task_list_mutex);
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        copied += sprintf(buf + copied, "%u: %u, %u\n", tmp->pid, tmp->period, tmp->computation);
+        copied += sprintf(buf + copied, "%d: %lu, %lu\n", tmp->pid, tmp->period, tmp->computation);
     }
     mutex_unlock(&rms_task_list_mutex);
 
@@ -158,11 +158,11 @@ void mp2_register_processs(char *buf)
     // initialize list
     INIT_LIST_HEAD(&(tmp->list));
     // set pid
-    sscanf(strsep(&buf, ","), "%u", &tmp->pid);
+    sscanf(strsep(&buf, ","), "%d", &tmp->pid);
     // set period
-    sscanf(strsep(&buf, ","), "%u", &tmp->period);
+    sscanf(strsep(&buf, ","), "%lu", &tmp->period);
     // set computation
-    sscanf(strsep(&buf, "\n"), "%u", &tmp->computation);
+    sscanf(strsep(&buf, "\n"), "%lu", &tmp->computation);
     // set deadline
     tmp->deadline = 0;
     // set linux_task
@@ -179,7 +179,7 @@ void mp2_register_processs(char *buf)
     mutex_lock_interruptible(&rms_task_list_mutex);
     list_add(&(tmp->list), &rms_task_struct_list);
     list_for_each_entry(tmp1, &(rms_task_struct_list), list) {
-        printk(KERN_ALERT "Hello %ld %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
+        printk(KERN_ALERT "Hello %d %lu %lu\n", tmp1->pid, tmp1->period, tmp1->computation);
     }
     mutex_unlock(&rms_task_list_mutex);
 }
@@ -255,6 +255,15 @@ void mp2_unregister_process(char *buf)
     kmem_cache_free(mp2_task_struct_cache, tmp);
 }
 
+/**
+ * function to write /proc file
+ *
+ * @param *file     file to write
+ * @param *buffer   user buffer
+ * @param size      size of user buffer
+ * @param *offl     offset in the file
+ * @return size     number of byte written
+ */
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *loff) {
     unsigned long cpy_usr_byte;
     char *kbuf;

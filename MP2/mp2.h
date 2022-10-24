@@ -18,7 +18,7 @@ MODULE_DESCRIPTION("CS-423 MP2");
 #define DIRECTORY       "mp2"
 #define REGISTRATION    'R'
 #define YIELD           'Y'
-#define DEREGISTRATION  'D'
+#define DE_REGISTRATION 'D'
 #define SLEEPING        1
 #define READY           2
 #define RUNNING         3
@@ -45,11 +45,11 @@ typedef struct rms_task_struct{
 
 static spinlock_t lock;
 static struct proc_dir_entry *proc_dir, *proc_entry;
-static ssize_t mp2_read(struct file *file, char __user *buffer, size_t count, loff_t *data);
-static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t count, loff_t *data);
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, loff_t *data);
+static ssize_t proc_write(struct file *file, const char __user *buffer, size_t count, loff_t *data);
 static const struct proc_ops proc_fops = {
-        .proc_read    = mp2_read,
-        .proc_write   = mp2_write
+        .proc_read    = proc_read,
+        .proc_write   = proc_write
 };
 static struct task_struct *dispatch_thread;
 static rms_task_struct *current_running_task = NULL;

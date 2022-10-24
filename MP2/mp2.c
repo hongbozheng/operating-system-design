@@ -117,7 +117,7 @@ static int dispatch_thread_fn(void *data)
     }
 }
 
-static ssize_t mp2_read(struct file *file, char __user *buffer, size_t count, loff_t *data)
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, loff_t *data)
 {
     if (*data == 1) {
         return 0;
@@ -255,13 +255,29 @@ void mp2_unregister_process(char *buf)
     kmem_cache_free(mp2_task_struct_cache, tmp);
 }
 
-static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t count, loff_t *data)
-{
+static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *loff) {
+    unsigned long cpy_usr_byte;
     char *kbuf;
 
-    kbuf = (char *)kmalloc(count + 1, GFP_KERNEL);
-    copy_from_user(kbuf, buffer, count);
-    kbuf[count] = '\0';
+    // check the access of the buffer
+    if (!access_ok(buffer, size)) {
+        printk(KERN_ALERT "Buffer is NOT READABLE\n");
+        return -EINVAL;
+    }
+
+    // allocate memory in kernel
+    kbuf = (char *)kmalloc(size + 1, GFP_KERNEL);
+    if (kbuf == NULL) {
+        printk(KERN_ALERT "Fail to allocate memory in kernel\n");
+        return -ENOMEM;
+    }
+
+    cpy_usr_byte = copy_from_user(kbuf, buffer, size);
+    if (cpy_usr_byte != 0) {
+        printk(KERN_ALERT "copy_from_user fail\n");
+    }
+
+    kbuf[size] = '\0';     // null terminate kbuf
 
     switch (kbuf[0]) {
         case REGISTRATION:
@@ -270,7 +286,7 @@ static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t co
         case YIELD:
             mp2_yield_process(kbuf + 3);
             break;
-        case DEREGISTRATION:
+        case DE_REGISTRATION:
             mp2_unregister_process(kbuf + 3);
             break;
         default:
@@ -279,7 +295,7 @@ static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t co
 
     kfree(kbuf);
 
-    return count;
+    return size;
 }
 
 /**

@@ -57,6 +57,7 @@ rms_task_struct *get_highest_priority_ready_task(void) {
     rms_task_struct *tmp, *task = NULL;
 
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-locking/API-mutex-lock-interruptible.html
+    // Reference: https://elixir.bootlin.com/linux/latest/source/kernel/locking/mutex.c#L977
     mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
     list_for_each_entry(tmp, &rms_task_struct_list, list) {
         if (tmp->state != READY) continue;                  // skip NOT READY tasks

@@ -124,6 +124,7 @@ int main(int argc, char* argv[]) {
     }
 
     // record the time when the task starts
+    // Reference: https://man7.org/linux/man-pages/man2/gettimeofday.2.html
     gettimeofday(&t0, NULL);
     printf("[USRAPP]: TASK START TIME %ld\n", t0.tv_sec);
 

@@ -1,0 +1,42 @@
+#ifndef __MP2_H__
+#define __MP2_H__
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/proc_fs.h>
+#include <linux/slab.h>             // KMEM_CACHE
+#include <linux/kthread.h>          // kthread_run & kthread_should_stop
+#include <uapi/linux/sched/types.h> // struct sched_attr
+#include "mp2_given.h"
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Group_ID");
+MODULE_DESCRIPTION("CS-423 MP2");
+
+#define DEBUG            1
+#define FILENAME         "status"
+#define DIRECTORY        "mp2"
+#define REGISTRATION     'R'
+#define YIELD            'Y'
+#define DEREGISTRATION   'D'
+#define SLEEPING         1
+#define READY            2
+#define RUNNING          3
+
+LIST_HEAD(rms_task_struct_list);
+
+typedef struct rms_task_struct{
+    struct task_struct *linux_task;
+    struct timer_list wakeup_timer;
+    struct list_head list;
+
+    // milliseconds
+    unsigned int pid;
+    unsigned int period;
+    unsigned int computation;
+    unsigned int state;
+    // jiffies
+    unsigned long deadline;
+} rms_task_struct;
+
+#endif

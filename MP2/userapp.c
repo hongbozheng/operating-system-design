@@ -1,68 +1,148 @@
+/**
+ * FILENAME: userapp.c
+ *
+ * DESCRIPTION: mp2 userapp
+ *
+ * AUTHOR: Hongbo Zheng
+ *
+ * DATE: Sunday Oct 23th, 2022
+ */
+
 #include "userapp.h"
-#include <stdlib.h>
 
-#define BUFLEN        1000
+/**
+ * function to register a process to /proc/mp2/status
+ * with syntax "R, <pid>, <period>, <computation_time>"
+ *
+ * @param pid           process id
+ * @param period        task period
+ * @param computation   task computation time
+ */
+void register_process(pid_t pid, unsigned long period, unsigned long computation) {
+    FILE *f;
+    f = fopen(FILENAME,"w");
+    fprintf(f,"R, %d, %lu, %lu", pid, period, computation);
+    fclose(f);
+}
 
-int main(int argc, char* argv[])
-{
-    int loop_cycle = atoi(argv[3]), i, len, offset;
-    //int fact_iteration = get_iteration(MAPPINGFILE, atoi(argv[2]));
-    unsigned int pid = getpid();
-    char buf[BUFLEN];
-    struct timeval t0, start, end;
-    //struct timespec t0, start, end;
-    //struct timespec t0, start, end;
+/**
+ * function to read /proc/mp2/status and check if
+ * pid is written successfully in /proc/mp2/status
+ *
+ * @param pid
+ * @return int  1-pid exists    0-pid not exist
+ */
+int process_exist(pid_t pid) {
+    FILE *f;
+    char buf[20];
+    int pid_regd;
+    int cnt = 0;
+
+    f = fopen("/proc/mp2/status","r");      // open file /proc/mp2/status
+
+    while(fscanf(f, "%s" , buf)) {
+        sscanf(buf, "%d", &pid_regd);
+
+        if ((cnt % SKIP_NUM_VAL) == 0) {    // check every three num
+            if (pid == pid_regd) {          // pid exists in /proc/mp2/status
+                fclose(f);                  // close f
+                return 1;                   // return 1
+            }
+        }
+        ++cnt;                              // increment cnt
+    }
+    fclose(f);                              // close f
+    return 0;                               // pid DNE, return 0
+}
+
+/**
+ * function that yield a process
+ *
+ * @param pid   process id
+ * @return void
+ */
+void yield_process(pid_t pid) {
+    FILE *f;
+    f = fopen(FILENAME, "w");
+    fprintf(f, "Y, %d", pid);
+    fclose(f);
+}
+
+/**
+ * function that de-register a process
+ *
+ * @param pid   process id
+ * @return void
+ */
+void deregister_process(pid_t pid) {
+    FILE *f;
+    f = fopen(FILENAME, "w");
+    fprintf(f, "D, %d", pid);
+    fclose(f);
+}
+
+/**
+ * do some random things when process is woke up
+ *
+ * @param
+ * @return void
+ */
+void do_job(int n) {
+    int i, j, k ,tmp;
+    for (i = 0; i < n; i ++) {
+        for (j = 0; j < n; j ++) {
+            for (k = 0; k < n; k ++) {
+                tmp = i * j * k - i - j - k;
+            }
+        }
+    }
+}
+
+int main(int argc, char* argv[]) {
+    pid_t pid = getpid();                           // get task pid
+    unsigned long period, computation;
+    unsigned int freq = atoi(argv[3]);              // get task frequency
+    // Reference: https://pubs.opengroup.org/onlinepubs/7908799/xsh/systime.h.html
+    struct timeval t0, start, end;                  // struct timeval record time
 
     if (argc != 4) {
-        puts("error in argc");
+        printf("[USRAPP]: ./userapp <pid> <PERIOD> <COMPUTATION_TIME> <FREQUENCY>\n");
         return 1;
     }
-    unsigned long period, computation;
-    sscanf(argv[1],"%lu",&period);
-    sscanf(argv[2],"%lu",&computation);
 
-    printf("INFO: period: %lu computation: %lu\n", period, computation);
+    sscanf(argv[1],"%lu",&period);                  // get task period
+    sscanf(argv[2],"%lu",&computation);             // get task computation time
 
+    printf("[USRAPP]: REGISTER TASK PID: %d, C: %lu, P: %lu, F: %u\n", pid, computation, period, freq);
     // register process through /proc/mp2/status
     register_process(pid, period, computation);
-    //printf("Register process %d\n", pid);
+
     // read /proc/mp2/status and check if the process registered successfully
-    if (!is_process_exist(pid)) {
-        puts("error in is_process_exist");
+    if (!process_exist(pid)) {
+        printf("[USRAPP]: PROCESS ID NOT EXISTS\n");
         exit(1);
     }
-    printf("Register process: %u\n", pid);
-    // record when the task start
-    gettimeofday(&t0, NULL);
-    printf("T0 Time: %ld\n", t0.tv_sec);
 
-    // prepare for the buffer which will be written to the log file
-    offset = sprintf(buf, "%u\t%s\t%s\t", pid, argv[1], argv[2]);
+    // record the time when the task starts
+    gettimeofday(&t0, NULL);
+    printf("[USRAPP]: TASK START TIME %ld\n", t0.tv_sec);
 
     // write yield to /proc/mp2/status
     yield_process(pid);
 
-    for (i = 0; i < loop_cycle; i ++) {
+    // real-time loop, simulate periodic application
+    for (int i = 0; i < freq; ++i) {
+        printf("--------------------------------------------------\n");
         gettimeofday(&start, NULL);
-        printf("Start Time %ld\n", start.tv_sec);
+        printf("[USRAPP]: WAKEUP TIME %ld\n", (start.tv_sec - t0.tv_sec));
         do_job(100);
         gettimeofday(&end, NULL);
-
-        // write to the log file
-//        len = sprintf(buf + offset, "%f\t%f\t%f\n", time_diff(start, end), time_diff(t0, start), time_diff(t0, end));
-//        buf[offset + len] = '\0';
-        //write_log(buf);
-
-        // write yield to /proc/mp2/status
-        //printf("Yield Time: %ld\n", start.tv_sec);
-        printf("Start - t0 Time: %ld\n", (start.tv_sec - t0.tv_sec));
+        printf("[USRAPP]: YIELD PROCESS WITH PID %d\n", pid);
         yield_process(pid);
-
     }
 
-    // unregister process through /proc/mp2/status
-    printf("Unregister ------\n");
-    unregister_process(pid);
+    printf("[USRAPP]: DEREGISTER PROCESS WITH PID %d\n", pid);
+    deregister_process(pid);
 
 	return 0;
 }

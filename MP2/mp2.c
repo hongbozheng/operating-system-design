@@ -257,32 +257,37 @@ void mp2_unregister_process(char *buf)
 
 static ssize_t mp2_write(struct file *file, const char __user *buffer, size_t count, loff_t *data)
 {
-    char *buf;
+    char *kbuf;
 
-    buf = (char *)kmalloc(count + 1, GFP_KERNEL);
-    copy_from_user(buf, buffer, count);
-    buf[count] = '\0';
+    kbuf = (char *)kmalloc(count + 1, GFP_KERNEL);
+    copy_from_user(kbuf, buffer, count);
+    kbuf[count] = '\0';
 
-    switch (buf[0]) {
+    switch (kbuf[0]) {
         case REGISTRATION:
-            mp2_register_processs(buf + 3);
+            mp2_register_processs(kbuf + 3);
             break;
         case YIELD:
-            mp2_yield_process(buf + 3);
+            mp2_yield_process(kbuf + 3);
             break;
         case DEREGISTRATION:
-            mp2_unregister_process(buf + 3);
+            mp2_unregister_process(kbuf + 3);
             break;
         default:
-            printk(KERN_INFO "error in my_mapping(opt)\n");
+            printk(KERN_ALERT "Task Status Not Found\n");
     }
 
-    kfree(buf);
+    kfree(kbuf);
 
     return count;
 }
 
-// mp2_init - Called when module is loaded
+/**
+ * called when mp2 module is loaded
+ *
+ * @param   void
+ * @return  int 0-success, other-failed
+ */
 static int __init mp2_init(void) {
     #ifdef DEBUG
     printk(KERN_ALERT "MP2 MODULE LOADING\n");
@@ -313,7 +318,12 @@ static int __init mp2_init(void) {
     return 0;
 }
 
-// mp1_exit - Called when module is unloaded
+/**
+ * called when mp2 module is unloaded
+ *
+ * @param   void
+ * @return  void
+ */
 static void __exit mp2_exit(void) {
     rms_task_struct *pos, *n;
 

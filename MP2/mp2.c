@@ -3,19 +3,16 @@
 #include "mp2.h"
 
 
-rms_task_struct *__get_task_by_pid(pid_t pid)
-{
+rms_task_struct *__get_task_by_pid(pid_t pid) {
     rms_task_struct *task;
     list_for_each_entry(task, &rms_task_struct_list, list) {
-        if (task->pid == pid) {
-            return task;
-        }
+        if (task->pid == pid) return task;
     }
     // if no task with such pid, then return NULL
     return NULL;
 }
 
-void timer_callback(struct timer_list *timer)//unsigned long pid)
+void timer_callback(struct timer_list *timer)
 {
     printk(KERN_ALERT "Timer callback\n");
     unsigned long flags;

@@ -34,9 +34,9 @@ rms_task_struct *__get_task_by_pid(pid_t pid) {
  * @return void
  */
 void timer_callback(struct timer_list *timer) {
-    printk(KERN_ALERT "[KERN_ALERT]: TIMER CALLBACK\n");
     unsigned long flag;
     rms_task_struct *task;
+    printk(KERN_ALERT "[KERN_ALERT]: TIMER CALLBACK\n");
     spin_lock_irqsave(&lock, flag);                             // enter critical section
     task = container_of(timer, rms_task_struct, wakeup_timer);  // get the task
     __get_task_by_pid(task->pid)->state = READY;                // set task->state to READY
@@ -135,31 +135,38 @@ static int dispatch_thread_fn(void *arg) {
  * @param *offl     offset in the file
  * @return ssize_t  number of byte copied
  */
-static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, loff_t *data) {
-    if (*data == 1) {
-        return 0;
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *loff) {
+    unsigned long cpy_kernel_byte;
+    ssize_t byte_read = 0;
+    char *kbuf;
+    rms_task_struct *task;
+    if (*loff == 1) return 0;
+    
+    // allocate memory in kernel
+    kbuf = (char *)kmalloc(size, GFP_KERNEL);
+    if (kbuf == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate memory in kernel\n");
+        return -ENOMEM;
     }
-    unsigned long copied = 0;
-    char *buf;
-    rms_task_struct *tmp;
 
-    buf = (char *)kmalloc(count, GFP_KERNEL);
-
-    // loop through the tasks in the list
-    mutex_lock_interruptible(&task_list_mutex);
-    list_for_each_entry(tmp, &rms_task_struct_list, list) {
-        copied += sprintf(buf + copied, "%d: %lu, %lu\n", tmp->pid, tmp->period, tmp->computation);
+    // get all the task info in the list
+    mutex_lock_interruptible(&task_list_mutex);     // enter critical section
+    list_for_each_entry(task, &rms_task_struct_list, list) {
+        byte_read += sprintf(kbuf + byte_read, "%d: %lu, %lu\n", task->pid, task->period, task->computation);
     }
-    mutex_unlock(&task_list_mutex);
+    mutex_unlock(&task_list_mutex);                 // exit critical section
 
-    buf[copied] = '\0';
+    kbuf[byte_read] = '\0';                         // null terminate kbuf
 
-    copy_to_user(buffer, buf, copied);
+    cpy_kernel_byte = copy_to_user(buffer, kbuf, byte_read);
+    if (cpy_kernel_byte != 0) {
+        printk(KERN_ALERT "[KERN_ALERT]: copy_from_user fail\n");
+    }
 
-    kfree(buf);
+    kfree(kbuf);
 
-    *data = 1;
-    return copied;
+    *loff = 1;
+    return byte_read;
 }
 
 /**
@@ -230,10 +237,10 @@ void register_process(char *buf) {
  */
 void yield_process(char *buf)
 {
-    printk(KERN_ALERT "MP2 Yield process\n");
     pid_t pid;
     rms_task_struct *tmp;
     int should_skip;
+    printk(KERN_ALERT "MP2 Yield process\n");
 
     // set task to tmp
     sscanf(buf, "%u", &pid);
@@ -278,10 +285,9 @@ void yield_process(char *buf)
  * @return void
  */
 void deregister_process(char *buf) {
-    printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS\n");
-
     pid_t pid;
     rms_task_struct *task;
+    printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS\n");
 
     sscanf(buf, "%d", &pid);                    // get task pid from buf
 

@@ -52,7 +52,7 @@ typedef struct rms_task_struct{
 
 static spinlock_t lock;
 static struct proc_dir_entry *proc_dir, *proc_entry;
-static ssize_t proc_read(struct file *file, char __user *buffer, size_t count, loff_t *data);
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *loff);
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *loff);
 static const struct proc_ops proc_fops = {
         .proc_read    = proc_read,

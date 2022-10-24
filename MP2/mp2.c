@@ -2,14 +2,19 @@
 
 #include "mp2.h"
 
-
+/**
+ * function that get the rms_task_struct *ptr
+ * using the given pid
+ *
+ * @param pid process id
+ * @return rms_task_struct *ptr
+ */
 rms_task_struct *__get_task_by_pid(pid_t pid) {
     rms_task_struct *task;
     list_for_each_entry(task, &rms_task_struct_list, list) {
-        if (task->pid == pid) return task;
+        if (task->pid == pid) return task;  // found task, return task
     }
-    // if no task with such pid, then return NULL
-    return NULL;
+    return NULL;                            // task not found, return NULL
 }
 
 void timer_callback(struct timer_list *timer)
@@ -26,8 +31,14 @@ void timer_callback(struct timer_list *timer)
     wake_up_process(dispatch_thread);
 }
 
-rms_task_struct *get_highest_priority_ready_task(void)
-{
+/**
+ * function that find the ready task
+ * with the highest priority
+ *
+ * @param void
+ * @return rms_task_struct *ptr
+ */
+rms_task_struct *get_highest_priority_ready_task(void) {
     rms_task_struct *tmp, *result = NULL;
 
     mutex_lock_interruptible(&task_list_mutex);

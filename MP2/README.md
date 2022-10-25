@@ -84,8 +84,8 @@ Run the following command
 ##### 8. `proc_write` function
 * in `mp1.c`, store `copy_from_user` information into `kbuf`
 * call different functions based on the first letter ( kbuf [0] )
-  * `REGISTRATION` &nbsp;&nbsp;&nbsp;&nbsp; -----> `register_process`
-  * `YIELD` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `yield_process`
+  * `REGISTRATION` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `register_process`
+  * `YIELD` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `yield_process`
   * `DE_REGISTRATION` -----> `deregister_process`
 
 ##### 9. `admission_control` function

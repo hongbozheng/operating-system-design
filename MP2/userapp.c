@@ -57,6 +57,7 @@ int process_exist(pid_t pid) {
 
 /**
  * function that yield a process
+ * with syntax "Y, <pid>"
  *
  * @param pid   process id
  * @return void
@@ -70,6 +71,7 @@ void yield_process(pid_t pid) {
 
 /**
  * function that de-register a process
+ * with syntax "D, <pid>"
  *
  * @param pid   process id
  * @return void
@@ -88,13 +90,9 @@ void deregister_process(pid_t pid) {
  * @return void
  */
 void do_job(int n) {
-    int i, j, k ,tmp;
-    for (i = 0; i < n; i ++) {
-        for (j = 0; j < n; j ++) {
-            for (k = 0; k < n; k ++) {
-                tmp = i * j * k - i - j - k;
-            }
-        }
+    unsigned int factorial = 0;
+    for (int i = 1; i < n; ++i) {
+        factorial *= i;
     }
 }
 
@@ -138,7 +136,7 @@ int main(int argc, char* argv[]) {
         printf("--------------------------------------------------\n");
         gettimeofday(&start, NULL);
         printf("[USRAPP]: WAKEUP TIME %ld\n", (start.tv_sec - t0.tv_sec));
-        do_job(100);
+        do_job(10);
         gettimeofday(&end, NULL);
         printf("[USRAPP]: YIELD PROCESS WITH PID %d\n", pid);
         yield_process(pid);

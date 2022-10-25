@@ -147,12 +147,12 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     rms_task_struct *task;
     if (*loff == 1) return 0;
 
-    if (!access_ok(buffer, size)) {                 // check the access of the buffer
+    if (!access_ok(buffer, size)) {                         // check the access of the buffer
         printk(KERN_ALERT "[KERN_ALERT]: User Buffer is NOT WRITABLE\n");
         return -EINVAL;
     }
 
-    kbuf = (char *)kmalloc(size, GFP_KERNEL);       // allocate memory in kernel
+    kbuf = (char *)kmalloc(size, GFP_KERNEL);               // allocate memory in kernel
     if (kbuf == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate memory in kernel\n");
         return -ENOMEM;

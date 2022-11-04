@@ -13,14 +13,14 @@
 #include "mp2.h"
 
 /**
- * function that get the rms_task_struct *ptr
+ * function that get the rms_task_struct_t *ptr
  * using the given pid
  *
  * @param pid process id
- * @return rms_task_struct *ptr
+ * @return rms_task_struct_t *ptr
  */
-rms_task_struct *__get_task_by_pid(pid_t pid) {
-    rms_task_struct *task;
+rms_task_struct_t *__get_task_by_pid(pid_t pid) {
+    rms_task_struct_t *task;
     list_for_each_entry(task, &rms_task_struct_list, list) {
         if (task->pid == pid) return task;  // found task, return task
     }
@@ -35,14 +35,14 @@ rms_task_struct *__get_task_by_pid(pid_t pid) {
  */
 void timer_callback(struct timer_list *timer) {
     unsigned long flag;
-    rms_task_struct *task;
+    rms_task_struct_t *task;
     printk(KERN_ALERT "[KERN_ALERT]: TIMER CALLBACK\n");
-    spin_lock_irqsave(&lock, flag);                             // enter critical section
-    task = container_of(timer, rms_task_struct, wakeup_timer);  // get the task
-    __get_task_by_pid(task->pid)->state = READY;                // set task->state to READY
-    spin_unlock_irqrestore(&lock, flag);                        // exit critical section
+    spin_lock_irqsave(&lock, flag);                                 // enter critical section
+    task = container_of(timer, rms_task_struct_t, wakeup_timer);    // get the task
+    __get_task_by_pid(task->pid)->state = READY;                    // set task->state to READY
+    spin_unlock_irqrestore(&lock, flag);                            // exit critical section
 
-    wake_up_process(dispatch_thread);                           // wake up dispatch_thread
+    wake_up_process(dispatch_thread);                               // wake up dispatch_thread
 }
 
 /**
@@ -50,11 +50,11 @@ void timer_callback(struct timer_list *timer) {
  * with the highest priority
  *
  * @param void
- * @return rms_task_struct *ptr
+ * @return rms_task_struct_t *ptr
  */
-rms_task_struct *get_highest_priority_ready_task(void) {
+rms_task_struct_t *get_highest_priority_ready_task(void) {
     int mutex_ret;
-    rms_task_struct *tmp, *task = NULL;
+    rms_task_struct_t *tmp, *task = NULL;
 
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-locking/API-mutex-lock-interruptible.html
     // Reference: https://elixir.bootlin.com/linux/latest/source/kernel/locking/mutex.c#L977
@@ -80,7 +80,7 @@ rms_task_struct *get_highest_priority_ready_task(void) {
  * @param task      task that needs to set priority
  * @param priority  task priority
  */
-void __set_priority(rms_task_struct *task, int policy, int priority) {
+void __set_priority(rms_task_struct_t *task, int policy, int priority) {
     // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
     struct sched_attr sa;
     sa.sched_policy = policy;       // set task scheduling policy
@@ -97,7 +97,7 @@ void __set_priority(rms_task_struct *task, int policy, int priority) {
  */
 static int dispatch_thread_fn(void *arg) {
     int mutex_ret;
-    rms_task_struct *task;
+    rms_task_struct_t *task;
 
     while (1) {
         // put dispatching thread to sleep
@@ -144,7 +144,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     ssize_t byte_read = 0;
     int mutex_ret;
     char *kbuf;
-    rms_task_struct *task;
+rms_task_struct_t *task;
     if (*loff == 1) return 0;
 
     if (!access_ok(buffer, size)) {                         // check the access of the buffer
@@ -188,7 +188,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 int admission_ctrl(unsigned long computation, unsigned long period) {
     int mutex_ret;
     unsigned long util_factor = 0;
-    rms_task_struct *task;
+    rms_task_struct_t *task;
 
     // sum up utilization of existing tasks
     mutex_ret = mutex_lock_interruptible(&task_list_mutex); // enter critical section
@@ -212,10 +212,10 @@ int admission_ctrl(unsigned long computation, unsigned long period) {
  */
 void register_process(char *buf) {
     int mutex_ret;
-    rms_task_struct *task;
+    rms_task_struct_t *task;
 
     // allocate memory by cache for tmp
-    task = (rms_task_struct *)kmem_cache_alloc(rms_task_struct_cache, GFP_KERNEL);
+    task = (rms_task_struct_t *)kmem_cache_alloc(rms_task_struct_cache, GFP_KERNEL);
 
     INIT_LIST_HEAD(&(task->list));                          // init list
     sscanf(strsep(&buf, ","), "%d", &task->pid);            // set task->pid
@@ -245,7 +245,7 @@ void register_process(char *buf) {
 void yield_process(char *buf) {
     pid_t pid;
     int mutex_ret;
-    rms_task_struct *task;
+    rms_task_struct_t *task;
     int wakeup;
 
     sscanf(buf, "%d", &pid);                                // set task->pid
@@ -286,7 +286,7 @@ void yield_process(char *buf) {
 void deregister_process(char *buf) {
     pid_t pid;
     int mutex_ret;
-    rms_task_struct *task;
+    rms_task_struct_t *task;
 
     sscanf(buf, "%d", &pid);                    // get task pid from buf
     printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS WITH PID: %d\n", pid);
@@ -400,7 +400,7 @@ static int __init mp2_init(void) {
  * @return void
  */
 static void __exit mp2_exit(void) {
-    rms_task_struct *pos, *n;
+    rms_task_struct_t *pos, *n;
 
     #ifdef DEBUG
     printk(KERN_ALERT "[KERN_ALERT]: MP2 MODULE UNLOADING\n");

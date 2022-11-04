@@ -49,11 +49,11 @@ typedef struct rms_task_struct{
     unsigned long computation;      // ms
     unsigned long deadline;         // jiffies
     unsigned int state;
-} rms_task_struct;
+} rms_task_struct_t;
 
 static spinlock_t lock;
 static struct task_struct *dispatch_thread;
-static rms_task_struct *cur_task = NULL;
+static rms_task_struct_t *cur_task = NULL;
 static struct kmem_cache *rms_task_struct_cache;
 static struct proc_dir_entry *proc_dir, *proc_entry;
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *loff);
@@ -64,10 +64,10 @@ static const struct proc_ops proc_fops = {
 };
 
 // function signature
-rms_task_struct *__get_task_by_pid(pid_t pid);
+rms_task_struct_t *__get_task_by_pid(pid_t pid);
 void timer_callback(struct timer_list *timer);
-rms_task_struct *get_highest_priority_ready_task(void);
-void __set_priority(rms_task_struct *task, int policy, int priority);
+rms_task_struct_t *get_highest_priority_ready_task(void);
+void __set_priority(rms_task_struct_t *task, int policy, int priority);
 static int dispatch_thread_fn(void *arg);
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *loff);
 int admission_ctrl(unsigned long computation, unsigned long period);

@@ -16,7 +16,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 	ssize_t byte_read = 0;
 	size_t len = 0;
 	char *kbuf;
-    proc_struct *ps;
+    proc_struct_t *ps;
 	struct status_buf *sbuf;
 
 	// check the access of the buffer
@@ -94,7 +94,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offl) {
     unsigned long flag, cpy_usr_byte;
     char *kbuf;
-    proc_struct *ps;
+    proc_struct_t *ps;
     
     // check the access of the buffer
     if (!access_ok(buffer, size)) {
@@ -113,7 +113,7 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
         printk(KERN_ERR "copy_from_user fail\n");
     }
 
-    ps = (proc_struct *)kmalloc(sizeof(proc_struct), GFP_KERNEL);
+    ps = (proc_struct_t *)kmalloc(sizeof(proc_struct_t), GFP_KERNEL);
 
     kbuf[size] = '\0';                      // null terminate kbuf
     sscanf(kbuf, "%u", &ps->pid);           // read buf and write to ps->pid
@@ -159,7 +159,7 @@ static void callback(struct timer_list *timer) {
  */
 static void update_cpu_time(struct work_struct *work) {
     unsigned long flag, cpu_time;
-    proc_struct *pos, *n;
+    proc_struct_t *pos, *n;
 
     spin_lock_irqsave(&lock, flag);         // enter critical section, save flags
     list_for_each_entry_safe(pos, n, &proc_list, list) {
@@ -228,7 +228,7 @@ int __init mp1_init(void) {
  * @return  void
  */
 void __exit mp1_exit(void) {
-    proc_struct *pos, *n;
+    proc_struct_t *pos, *n;
 
     #ifdef DEBUG
     printk(KERN_ALERT "MP1 MODULE UNLOADING\n");

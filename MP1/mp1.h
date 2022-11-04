@@ -29,7 +29,7 @@ typedef struct {
     struct list_head list;
     pid_t pid;
     unsigned long cpu_time;
-} proc_struct;
+} proc_struct_t;
 
 // create spinlock
 // Reference: https://docs.oracle.com/cd/E26502_01/html/E35303/ggecq.html

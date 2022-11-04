@@ -63,4 +63,19 @@ static const struct proc_ops proc_fops = {
         .proc_write   = proc_write
 };
 
+// function signature
+rms_task_struct *__get_task_by_pid(pid_t pid);
+void timer_callback(struct timer_list *timer);
+rms_task_struct *get_highest_priority_ready_task(void);
+void __set_priority(rms_task_struct *task, int policy, int priority);
+static int dispatch_thread_fn(void *arg);
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *loff);
+int admission_ctrl(unsigned long computation, unsigned long period);
+void register_process(char *buf);
+void yield_process(char *buf);
+void deregister_process(char *buf);
+static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *loff);
+static int __init mp2_init(void);
+static void __exit mp2_exit(void);
+
 #endif

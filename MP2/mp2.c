@@ -19,7 +19,7 @@
  * @param pid process id
  * @return rms_task_struct *ptr
  */
-rms_task_struct *__get_task_by_pid(pid_t pid) {
+rms_task_struct *_get_task_by_pid(pid_t pid) {
     rms_task_struct *task;
     list_for_each_entry(task, &rms_task_struct_list, list) {
         if (task->pid == pid) return task;  // found task, return task
@@ -80,7 +80,7 @@ rms_task_struct *get_highest_priority_ready_task(void) {
  * @param task      task that needs to set priority
  * @param priority  task priority
  */
-void __set_priority(rms_task_struct *task, int policy, int priority) {
+void _set_priority(rms_task_struct *task, int policy, int priority) {
     // Reference: https://elixir.free-electrons.com/linux/v5.10.16/source/include/uapi/linux/sched/types.h#L100
     struct sched_attr sa;
     sa.sched_policy = policy;       // set task scheduling policy

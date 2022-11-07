@@ -23,5 +23,3 @@ work: work.c
 
 clean:
 	rm -f monitor work *~ *.ko *.o *.mod.c Module.symvers modules.order
-
-

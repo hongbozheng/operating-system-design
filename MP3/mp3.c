@@ -19,7 +19,7 @@
 #include <linux/mm.h>
 #include <linux/cdev.h>
 #include <linux/device.h>
-#include "mp3_given.h"
+#include "mp3.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Group_ID");

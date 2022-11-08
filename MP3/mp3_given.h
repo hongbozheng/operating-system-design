@@ -25,10 +25,10 @@ int get_cpu_use(int pid, unsigned long *min_flt, unsigned long *maj_flt,
     rcu_read_lock();
     task = find_task_by_pid(pid);
     if (task != NULL) {
-        *min_flt=task->min_flt;
-        *maj_flt=task->maj_flt;
-        *utime=task->utime;
-        *stime=task->stime;
+        *min_flt = task->min_flt;
+        *maj_flt = task->maj_flt;
+        *utime = task->utime;
+        *stime = task->stime;
 
         task->maj_flt = 0;
         task->min_flt = 0;

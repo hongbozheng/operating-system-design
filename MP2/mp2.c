@@ -144,7 +144,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     ssize_t byte_read = 0;
     int mutex_ret;
     char *kbuf;
-rms_task_struct_t *task;
+    rms_task_struct_t *task;
     if (*loff == 1) return 0;
 
     if (!access_ok(buffer, size)) {                         // check the access of the buffer

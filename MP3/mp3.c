@@ -143,15 +143,20 @@ work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
 }
 
 /*Define the behavior when we register the target task*/
-int reg_proc(pid_t pid) {
+int reg_proc(char *buf) {
+    pid_t pid;
     unsigned long flag;
+
+    sscanf(buf, "%d", &pid);
+    printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID %d\n", pid);
+
     struct task_struct *linux_task = find_task_by_pid(pid);
     if (linux_task == NULL) return 0;
 
     work_proc_struct_t* work_proc = (work_proc_struct_t *)kmalloc(sizeof(work_proc_struct_t), GFP_KERNEL);
     if(work_proc == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate kernel memory\n");
-        return -1;
+        return -ENOMEM;
     }
 
     work_proc->pid = pid;
@@ -174,8 +179,12 @@ int reg_proc(pid_t pid) {
 }
 
 /*Define the behavior when we unregister the target task*/
-int dereg_proc(pid_t pid){
+int dereg_proc(char *buf){
+    pid_t pid;
     unsigned long flag;
+
+    sscanf(buf, "%d", &pid);
+    printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS WITH PID %d\n", pid);
 
     spin_lock_irqsave(&lock, flag);
     work_proc_struct_t *work_proc = __get_work_proc_by_pid(pid);
@@ -199,35 +208,40 @@ int dereg_proc(pid_t pid){
 
 /*Define the behavior when the proc file is wriiter by the user space program*/
 static ssize_t proc_write (struct file *file, const char __user *buffer, size_t size, loff_t *offset) {
-    char* buf;
-    int cpy = 0;
-    char cmd;
-    pid_t pid;
-    // allocate the space and init it used to get info from user space
-    buf = (char *)kmalloc(MAX_BUF * sizeof(char), GFP_KERNEL);
-    memset(buf, 0, MAX_BUF * sizeof(char));
-    cpy = copy_from_user(buf, buffer, size);
-    // add end sign
-    buf[size] = '\0';
-    printk(KERN_DEBUG "mp3: receive from user space with str %s\n", buf);
-    cmd = buf[0];
-    switch (cmd) {
+    unsigned long cpy_usr_byte;
+    char *kbuf;
+
+    if (!access_ok(buffer, size)) {
+        printk(KERN_ALERT "[KERN_ALERT]: Buffer is NOT READABLE\n");
+        return -EINVAL;
+    }
+
+    kbuf = (char *)kmalloc(size+1, GFP_KERNEL);
+    if (kbuf == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate kernel memory\n");
+        return -ENOMEM;
+    }
+
+    cpy_usr_byte = copy_from_user(kbuf, buffer, size);
+    if (cpy_usr_byte != 0) {
+        printk(KERN_ALERT "[KERN_ALERT]: copy_from_user fail\n");
+    }
+
+    kbuf[size] = '\0';
+
+    switch (kbuf[0]) {
         case REGISTRATION:
-            sscanf(buf, "R %d", &pid);
-            printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID %d\n", pid);
-            reg_proc(pid);
+            reg_proc(kbuf+PID_OFFSET);
             break;
         case DE_REGISTRATION:
-            sscanf(buf, "U %d", &pid);
-            printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS WITH PID %d\n", pid);
-            dereg_proc(pid);
+            dereg_proc(kbuf+PID_OFFSET);
             break;
         default:
             printk(KERN_ALERT "[KERN_ALERT]: INVALID CMD FOR PROCESS\n");
             break;
     }
 
-   kfree(buf);
+   kfree(kbuf);
    return size;
 }
 

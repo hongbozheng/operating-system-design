@@ -86,25 +86,6 @@ static ssize_t proc_read (struct file *file, char __user *buffer, size_t size, l
    return copied;
 }
 
-/*check whether the target task exists in the task linked list*/
-int check_process_exist(int pid){
-    work_proc_struct_t* cur;
-    work_proc_struct_t* tmp;
-   // indicate whether we find the task
-   int flag = 0;
-   // lock the spinning lock
-   spin_lock(&lock);
-   // travesal all the node
-   list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node){
-         //check the pid
-         if(cur->pid == pid){
-            flag = 1;
-            break;
-         }
-   }
-   spin_unlock(&lock);
-   return flag;
-}
 
 void profiler_work_function(struct work_struct *work) {
     work_proc_struct_t *cur;
@@ -136,6 +117,26 @@ void profiler_work_function(struct work_struct *work) {
    if (work_queue) {
 		queue_delayed_work(work_queue, &profiler_work, delay);
 	}
+}
+
+/*check whether the target task exists in the task linked list*/
+int check_process_exist(int pid){
+    work_proc_struct_t* cur;
+    work_proc_struct_t* tmp;
+    // indicate whether we find the task
+    int flag = 0;
+    // lock the spinning lock
+    spin_lock(&lock);
+    // travesal all the node
+    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node){
+        //check the pid
+        if(cur->pid == pid){
+            flag = 1;
+            break;
+        }
+    }
+    spin_unlock(&lock);
+    return flag;
 }
 
 /*Define the behavior when we register the target task*/
@@ -180,32 +181,33 @@ int registeration(int pid){
 
 /*Define the behavior when we unregister the target task*/
 int unregisteration(int pid){
+    unsigned long flag;
     work_proc_struct_t* cur;
     work_proc_struct_t* tmp;
-   int flag = 0;
+   int a = 0;
    printk(KERN_DEBUG "mp3: unregisteration for pid %d\n", pid);
    // traversal all the node
-   list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node)
-   {
-      if (pid == cur->pid){
-         spin_lock(&lock);
-         // remove list head
-         list_del(&cur->list_node);
-         // free the memory
-         kfree(cur);
-         printk(KERN_DEBUG "mp3: deregisteration delete for pid %d\n", pid);
-         spin_unlock(&lock);
-         flag = 1;
-      }
-   }
-   if (list_empty(&work_proc_struct_list)) {
-		cancel_delayed_work(&profiler_work);
-		flush_workqueue(work_queue);
-		destroy_workqueue(work_queue);
-      work_queue = NULL;
-		printk(KERN_INFO "mp3: deleted work queue");
+    spin_lock_irqsave(&lock, flag);
+    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node) {
+        if (pid == cur->pid){
+            // remove list head
+            list_del(&cur->list_node);
+            // free the memory
+            kfree(cur);
+            printk(KERN_DEBUG "mp3: deregisteration delete for pid %d\n", pid);
+            a = 1;
+        }
     }
-    if(!flag){
+    spin_unlock_irqrestore(&lock, flag);
+
+    if (list_empty(&work_proc_struct_list)) {
+        cancel_delayed_work(&profiler_work);
+        flush_workqueue(work_queue);
+        destroy_workqueue(work_queue);
+        work_queue = NULL;
+        printk(KERN_INFO "mp3: deleted work queue");
+    }
+    if(!a){
         printk(KERN_WARNING "mp2: deregisteration cannot find pid %d\n", pid);
     }
     return 0;

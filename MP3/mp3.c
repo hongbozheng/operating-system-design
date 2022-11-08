@@ -148,7 +148,7 @@ work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
 }
 
 /*Define the behavior when we register the target task*/
-int registeration(int pid) {
+int reg_proc(int pid) {
     unsigned long flag;
     struct task_struct *linux_task = find_task_by_pid(pid);
     if (linux_task == NULL) return 0;
@@ -159,7 +159,6 @@ int registeration(int pid) {
         return -1;
     }
 
-    printk(KERN_ALERT "[KERN_ALERT]: Register PID %d\n", pid);
     work_proc->pid = pid;
     work_proc->linux_task = linux_task;
     work_proc->utilization = 0;
@@ -199,7 +198,7 @@ int registeration(int pid) {
 }
 
 /*Define the behavior when we unregister the target task*/
-int unregisteration(int pid){
+int dereg_proc(int pid){
     unsigned long flag;
 //    work_proc_struct_t* cur;
 //    work_proc_struct_t* tmp;
@@ -237,43 +236,34 @@ int unregisteration(int pid){
 
 /*Define the behavior when the proc file is wriiter by the user space program*/
 static ssize_t proc_write (struct file *file, const char __user *buffer, size_t size, loff_t *data) {
-   char* buf;
-   char cmd;
-   int cpy = 0;
-   // allocate the space and init it used to get info from user space
-   buf = (char *)kmalloc(MAX_BUF * sizeof(char), GFP_KERNEL);
-   memset(buf, 0, MAX_BUF * sizeof(char));
-   cpy = copy_from_user(buf, buffer, size);
-   // add end sign
-   buf[size] = '\0';
-   printk(KERN_DEBUG "mp3: receive from user space with str %s\n", buf); 
-   cmd = buf[0];
-   switch (cmd)
-   {
-       case 'R':{
-            // register request
-            int pid;
+    char* buf;
+    char cmd;
+    pid_t pid;
+    int cpy = 0;
+    // allocate the space and init it used to get info from user space
+    buf = (char *)kmalloc(MAX_BUF * sizeof(char), GFP_KERNEL);
+    memset(buf, 0, MAX_BUF * sizeof(char));
+    cpy = copy_from_user(buf, buffer, size);
+    // add end sign
+    buf[size] = '\0';
+    printk(KERN_DEBUG "mp3: receive from user space with str %s\n", buf);
+    cmd = buf[0];
+    switch (cmd) {
+        case REGISTRATION:
             sscanf(buf, "R %d", &pid);
-            printk(KERN_DEBUG "mp3: registeration pid: %d\n", pid); 
-            // do the register operation
-            registeration(pid);
-       }
-       break;
-       case 'U':{
-            // unregister request
-            int pid;
+            printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID %d\n", pid);
+            reg_proc(pid);
+            break;
+        case DE_REGISTRATION:
             sscanf(buf, "U %d", &pid);
-            printk(KERN_DEBUG "mp3: unregisteration pid: %d\n", pid); 
-            // do the register operation
-            unregisteration(pid);
-       }
-       break;
-       default:{
-            // illegal command
-            printk(KERN_WARNING "mp3: receive illegal request\n"); 
-       }
-       break;
-   }
+            printk(KERN_ALERT "[KERN_ALERT]: DEREGISTER PROCESS WITH PID %d\n", pid);
+            dereg_proc(pid);
+            break;
+        default:
+            printk(KERN_ALERT "[KERN_ALERT]: INVALID CMD FOR PROCESS\n");
+            break;
+    }
+
    kfree(buf);
    return size;
 }

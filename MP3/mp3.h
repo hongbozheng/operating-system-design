@@ -20,7 +20,6 @@
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 #include <linux/workqueue.h>
-#include <linux/mutex.h>
 #include <linux/init.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
@@ -53,6 +52,8 @@ MODULE_DESCRIPTION("CS-423 MP3");
 
 static LIST_HEAD(work_proc_struct_list);
 static DEFINE_SPINLOCK(lock);
+static void profiler_work_function(struct work_struct *work);
+static DECLARE_DELAYED_WORK(profiler_work, &profiler_work_function);
 
 typedef struct work_proc_struct {
     struct task_struct *linux_task;

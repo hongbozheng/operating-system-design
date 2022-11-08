@@ -4,38 +4,35 @@
 
 unsigned long delay;
 
-void profiler_work_function(struct work_struct *work);
-DECLARE_DELAYED_WORK(profiler_work, &profiler_work_function);
-
 unsigned vbuf_ptr = 0;
 
 static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
-	unsigned long index = 0;
-   unsigned long pfn;
-   unsigned long size = vma->vm_end - vma->vm_start;
-	printk(KERN_INFO "mp3: receive mmap request\n");
+    unsigned long index = 0;
+    unsigned long pfn;
+    unsigned long size = vma->vm_end - vma->vm_start;
 
 	if (vma->vm_end - vma->vm_start > MAX_VBUFFER) {
 		printk(KERN_WARNING "mp3: mmap length exceed max vbuf\n");
 		return -1;
 	}
    
-   for (index = 0; index < size; index +=PAGE_SIZE){
-      pfn = vmalloc_to_pfn((void *)(((unsigned long)vbuf) + index));
-		if(remap_pfn_range(vma, vma->vm_start+index, pfn, PAGE_SIZE, vma->vm_page_prot)){
-			printk(KERN_ALERT "MP3 module could not perform mmap!\n");
-			return -1;
-		}
-	}
-	return 0;
+    for (index = 0; index < size; index +=PAGE_SIZE) {
+        pfn = vmalloc_to_pfn((void *)(((unsigned long)vbuf) + index));
+            if (remap_pfn_range(vma, vma->vm_start+index, pfn, PAGE_SIZE, vma->vm_page_prot)) {
+                printk(KERN_ALERT "MP3 module could not perform mmap!\n");
+                return -1;
+            }
+        }
+    return 0;
 }
 
 void profiler_work_function(struct work_struct *work) {
+    unsigned long flag;
     work_proc_struct_t *cur;
     unsigned long major_fault_sum, minor_fault_sum, utilization_sum, utime, stime;
     major_fault_sum = minor_fault_sum = utilization_sum = 0;
 
-    spin_lock(&lock);
+    spin_lock_irqsave(&lock, flag);
     list_for_each_entry(cur, &work_proc_struct_list, list_node){
         // traversal all the node in the list and write to the buffer
         if(0 == get_cpu_use(cur->pid, &cur->minor_page_fault, &cur->major_page_fault, &utime, &stime)){
@@ -46,7 +43,7 @@ void profiler_work_function(struct work_struct *work) {
             utilization_sum += cur->utilization;
         }
     }
-    spin_unlock(&lock);
+    spin_unlock_irqrestore(&lock, flag);
     // save the information to the memory buffer
     vbuf[vbuf_ptr++] = jiffies;
     vbuf[vbuf_ptr++] = minor_fault_sum;
@@ -108,7 +105,6 @@ work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
     return work_proc;
 }
 
-/*Define the behavior when we register the target task*/
 int reg_proc(char *buf) {
     pid_t pid;
     unsigned long flag;

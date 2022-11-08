@@ -7,7 +7,7 @@
 struct task_struct* find_task_by_pid(unsigned int nr) {
     struct task_struct* task = NULL;
     rcu_read_lock();
-    task=pid_task(find_vpid(nr), PIDTYPE_PID);
+    task = pid_task(find_vpid(nr), PIDTYPE_PID);
     rcu_read_unlock();
     if (task == NULL)
         printk(KERN_ALERT "[KERN_ALERT]: Cannot find task with pid %d\n", nr);
@@ -24,7 +24,7 @@ int get_cpu_use(int pid, unsigned long *min_flt, unsigned long *maj_flt,
     struct task_struct* task;
     rcu_read_lock();
     task = find_task_by_pid(pid);
-    if (task!=NULL) {
+    if (task != NULL) {
         *min_flt=task->min_flt;
         *maj_flt=task->maj_flt;
         *utime=task->utime;

@@ -21,9 +21,6 @@ unsigned long *vbuf;
 
 unsigned vbuf_ptr = 0;
 
-static dev_t device;
-struct cdev cdevice;
-
 int mp3_cdev_open(struct inode* inode, struct file* file) 
 {
   return 0;
@@ -261,6 +258,7 @@ static ssize_t proc_write (struct file *file, const char __user *buffer, size_t 
 // mp1_init - Called when module is loaded
 int __init mp3_init(void) {
    int index = 0;
+   int ret = 0;
    #ifdef DEBUG
    printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADING\n");
    #endif
@@ -277,30 +275,37 @@ int __init mp3_init(void) {
         return -ENOMEM;
     }
 
-   delay = msecs_to_jiffies(DELAY);
-   // init the spinning lock
-   spin_lock_init(&lock);
-   // Init entry to profile work callback
-   work_queue = NULL;
-   //create vbuffer
+    delay = msecs_to_jiffies(DELAY);
+
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-alloc-chrdev-region.html
+    if ((ret = alloc_chrdev_region(&dev, 0, 1, DEVICE_NAME)) < 0) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate character device\n");
+        goto rm_proc_entry;
+    }
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-init.html
+    cdev_init(&cdev, &cdev_fops);
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-add.html
+    cdev_add(&cdev, dev, 1);
+
+    // init the spinning lock
+    spin_lock_init(&lock);
+    // Init entry to profile work callback
+    work_queue = NULL;
+    //create vbuffer
 	vbuf = vmalloc(MAX_VBUFFER);
 	memset(vbuf, -1, MAX_VBUFFER);
 	for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
       SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
 	}
-   static const struct file_operations mp3_cdev_file = {
-		.owner = THIS_MODULE,
-		.open = mp3_cdev_open,
-		.release = mp3_cdev_close,
-		.mmap = mp3_cdev_mmap
-   };
-   //init character device driver
-	alloc_chrdev_region(&device, 0, 1, "mp3_device");
-	cdev_init(&cdevice, &mp3_cdev_file);
-	cdev_add(&cdevice, device, 1);
 
-   printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
-   return 0;   
+    printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
+    return 0;
+
+rm_proc_entry:
+    remove_proc_entry(FILENAME, proc_dir);
+    remove_proc_entry(FILENAME, NULL);
+
+    return ret;
 }
 
 // mp3_exit - Called when module is unloaded
@@ -334,8 +339,9 @@ void __exit mp3_exit(void)
    for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
       ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
 	}
-   cdev_del(&cdevice);
-	unregister_chrdev_region(device, 1);
+   // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-del.html
+   cdev_del(&cdev);
+	unregister_chrdev_region(dev, 1);
    remove_proc_entry(FILENAME, proc_dir);
    remove_proc_entry(DIRECTORY, NULL);
 

@@ -40,10 +40,12 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define FILENAME "status"
 #define DIRECTORY "mp3"
 #define DELAY 50
+#define MAJOR_NUM 423
+#define DEVICE_NAME "cdev"
 
 LIST_HEAD(work_proc_struct_list);
 
-typedef struct monitor_task_struct {
+typedef struct work_proc_struct {
     struct task_struct *linux_task;
     struct list_head list_node;
     unsigned int pid;
@@ -59,6 +61,17 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
 static const struct proc_ops proc_fops = {
         .proc_read = proc_read,
         .proc_write = proc_write,
+};
+static dev_t dev;
+struct cdev cdev;
+int mp3_cdev_open(struct inode* inode, struct file* file);
+int mp3_cdev_close(struct inode* inode, struct file* file);
+static int mp3_cdev_mmap(struct file *f, struct vm_area_struct *vma);
+static const struct file_operations cdev_fops = {
+        .owner = THIS_MODULE,
+        .open = mp3_cdev_open,
+        .release = mp3_cdev_close,
+        .mmap = mp3_cdev_mmap
 };
 
 #endif

@@ -42,6 +42,11 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define DELAY 50
 #define MAJOR_NUM 423
 #define DEVICE_NAME "cdev"
+#define NUM_PAGE 128
+// max buf size
+#define MAX_BUF 4096
+// file and dir name
+#define MAX_VBUFFER (4 * 128 * 1024)
 
 static LIST_HEAD(work_proc_struct_list);
 static DEFINE_SPINLOCK(lock);

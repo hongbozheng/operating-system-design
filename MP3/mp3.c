@@ -304,26 +304,23 @@ int __init mp3_init(void) {
 
     work_queue = NULL;
 
-	for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
-      SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
-	}
+    // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
+    for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
+        SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
+    }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
     return 0;
 
 rm_wq:
     destroy_workqueue(wq);
-
 rm_cdev:
     cdev_del(&cdev);
-
 unreg_cdev:
     unregister_chrdev_region(dev, 1);
-
 rm_proc_entry:
     remove_proc_entry(FILENAME, proc_dir);
     remove_proc_entry(FILENAME, NULL);
-
     return ret;
 }
 
@@ -355,9 +352,10 @@ void __exit mp3_exit(void)
          kfree(cur);
    }
    spin_unlock(&lock);
-   for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
-      ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
-	}
+    // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
+    for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
+        ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
+    }
    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-del.html
    cdev_del(&cdev);
 	unregister_chrdev_region(dev, 1);

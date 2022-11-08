@@ -2,24 +2,11 @@
 
 #include "mp3.h"
 
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Group_ID");
-MODULE_DESCRIPTION("CS-423 MP3");
-
-#define DEBUG
 // max buf size
 #define MAX_BUF 4096
 // file and dir name
 #define MAX_VBUFFER (4 * 128 * 1024)
-#define FILENAME "status"
-#define DIRECTORY "mp3"
 
-// the proc entry
-static struct proc_dir_entry *proc_dir;
-static struct proc_dir_entry *proc_entry;
-
-// spinning lock used to sync
-spinlock_t sp_lock;
 unsigned long delay;
 
 // linked list which will be used to store all the task
@@ -85,14 +72,14 @@ static ssize_t proc_read (struct file *file, char __user *buffer, size_t size, l
    kbuf = (char *)kmalloc(MAX_BUF * sizeof(char), GFP_KERNEL);
    memset(kbuf, 0, MAX_BUF * sizeof(char));
 
-   spin_lock(&sp_lock);
+   spin_lock(&lock);
    // todo
    list_for_each_entry(cur, &work_proc_struct_list, list_node){
         // traversal all the node in the list and write to the buffer
         copied += sprintf(kbuf + copied, "PID: %d\n", cur->pid);
         printk(KERN_DEBUG "mp3: writing PID: %d\n", cur->pid);
    }
-   spin_unlock(&sp_lock);
+   spin_unlock(&lock);
    // add end sign
    kbuf[copied] = '\0';
    printk(KERN_DEBUG "mp3: read callback with content %s\n", kbuf);
@@ -110,7 +97,7 @@ int check_process_exist(int pid){
    // indicate whether we find the task
    int flag = 0;
    // lock the spinning lock
-   spin_lock(&sp_lock);
+   spin_lock(&lock);
    // travesal all the node
    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node){
          //check the pid
@@ -119,7 +106,7 @@ int check_process_exist(int pid){
             break;
          }
    }
-   spin_unlock(&sp_lock);
+   spin_unlock(&lock);
    return flag;
 }
 
@@ -128,7 +115,7 @@ void profiler_work_function(struct work_struct *work) {
    unsigned long major_fault_sum, minor_fault_sum, utilization_sum, utime, stime;
    major_fault_sum = minor_fault_sum = utilization_sum = 0;
 
-   spin_lock(&sp_lock);
+   spin_lock(&lock);
    list_for_each_entry(cur, &work_proc_struct_list, list_node){
         // traversal all the node in the list and write to the buffer
       if(0 == get_cpu_use(cur->pid, &cur->minor_page_fault, &cur->major_page_fault, &utime, &stime)){
@@ -139,7 +126,7 @@ void profiler_work_function(struct work_struct *work) {
          utilization_sum += cur->utilization;
 		}
    }
-   spin_unlock(&sp_lock);
+   spin_unlock(&lock);
    // save the information to the memory buffer
 	vbuf[vbuf_ptr++] = jiffies;
    vbuf[vbuf_ptr++] = minor_fault_sum;
@@ -188,10 +175,10 @@ int registeration(int pid){
        work_queue = create_singlethread_workqueue("workqueue");
    }
    queue_delayed_work(work_queue, &profiler_work, delay);
-   spin_lock(&sp_lock);
+   spin_lock(&lock);
    // add the current task to the linked list
    list_add(&process->list_node, &work_proc_struct_list);
-   spin_unlock(&sp_lock);
+   spin_unlock(&lock);
    return 0;
 }
 
@@ -205,13 +192,13 @@ int unregisteration(int pid){
    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node)
    {
       if (pid == cur->pid){
-         spin_lock(&sp_lock);
+         spin_lock(&lock);
          // remove list head
          list_del(&cur->list_node);
          // free the memory
          kfree(cur);
          printk(KERN_DEBUG "mp3: deregisteration delete for pid %d\n", pid);
-         spin_unlock(&sp_lock);
+         spin_unlock(&lock);
          flag = 1;
       }
    }
@@ -275,31 +262,24 @@ static ssize_t proc_write (struct file *file, const char __user *buffer, size_t 
 int __init mp3_init(void) {
    int index = 0;
    #ifdef DEBUG
-   printk(KERN_DEBUG "MP3 MODULE LOADING\n");
+   printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADING\n");
    #endif
    // Insert your code here ...
-   // create dir
-	proc_dir = proc_mkdir(DIRECTORY, NULL);
-   
-   if(proc_dir == NULL){
-      // check create result
-      printk(KERN_ERR "mp3: 423 mp3 load failed at create proc dir\n");
-      return -1;
-   }
-   // bind the callback function for the file
 
-   // create the file entry and bind callback for read and write
-   proc_entry = proc_create(FILENAME, 0666, proc_dir, &mp3_file);
-   if(proc_entry == NULL){
-      printk(KERN_ERR "mp3: 423 mp3 load failed at create proc entry\n");
-      remove_proc_entry(DIRECTORY, NULL);
-      return -1;
-   }
-   delay = msecs_to_jiffies(50);
+    if ((proc_dir = proc_mkdir(DIRECTORY, NULL)) == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "\n");
+        return -ENOMEM;
+    }
+
+    if ((proc_entry = proc_create(FILENAME, 0666, proc_dir, &proc_fops)) == NULL) {
+        remove_proc_entry(DIRECTORY, NULL);
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "/" FILENAME "\n");
+        return -ENOMEM;
+    }
+
+   delay = msecs_to_jiffies(DELAY);
    // init the spinning lock
-   spin_lock_init(&sp_lock);
-   // init process list
-   INIT_LIST_HEAD(&work_proc_struct_list);
+   spin_lock_init(&lock);
    // Init entry to profile work callback
    work_queue = NULL;
    //create vbuffer
@@ -319,7 +299,7 @@ int __init mp3_init(void) {
 	cdev_init(&cdevice, &mp3_cdev_file);
 	cdev_add(&cdevice, device, 1);
 
-   printk(KERN_DEBUG "MP3 MODULE LOADED\n");
+   printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
    return 0;   
 }
 
@@ -330,7 +310,7 @@ void __exit mp3_exit(void)
     work_proc_struct_t* tmp;
     int index = 0;
     #ifdef DEBUG
-    printk(KERN_ALERT "MP3 MODULE UNLOADING\n");
+    printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADING\n");
     #endif
     // Insert your code here ...
 
@@ -341,7 +321,7 @@ void __exit mp3_exit(void)
         work_queue = NULL;
     }
 
-   spin_lock(&sp_lock);
+   spin_lock(&lock);
    // delete all the entries in the list
    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node){
          printk(KERN_DEBUG "mp3: remove pid: %d from list \n", cur->pid);
@@ -350,7 +330,7 @@ void __exit mp3_exit(void)
          // free the memory
          kfree(cur);
    }
-   spin_unlock(&sp_lock);
+   spin_unlock(&lock);
    for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
       ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
 	}
@@ -359,7 +339,7 @@ void __exit mp3_exit(void)
    remove_proc_entry(FILENAME, proc_dir);
    remove_proc_entry(DIRECTORY, NULL);
 
-   printk(KERN_ALERT "MP3 MODULE UNLOADED\n");
+   printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADED\n");
 }
 
 // Register init and exit funtions

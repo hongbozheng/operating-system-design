@@ -32,6 +32,15 @@
 #include <linux/device.h>
 #include "mp3_given.h"
 
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Group_ID");
+MODULE_DESCRIPTION("CS-423 MP3");
+
+#define DEBUG
+#define FILENAME "status"
+#define DIRECTORY "mp3"
+#define DELAY 50
+
 LIST_HEAD(work_proc_struct_list);
 
 typedef struct monitor_task_struct {
@@ -43,10 +52,11 @@ typedef struct monitor_task_struct {
     unsigned long minor_page_fault;
 } work_proc_struct_t;
 
+static spinlock_t lock;
+static struct proc_dir_entry *proc_dir, *proc_entry;
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset);
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *data);
-
-static const struct proc_ops mp3_file = {
+static const struct proc_ops proc_fops = {
         .proc_read = proc_read,
         .proc_write = proc_write,
 };

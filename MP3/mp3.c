@@ -139,65 +139,86 @@ int check_process_exist(int pid){
     return flag;
 }
 
+work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
+    work_proc_struct_t *work_proc;
+    list_for_each_entry(work_proc, &work_proc_struct_list, list_node) {
+        if (work_proc->pid == pid) return work_proc;
+    }
+    return NULL;
+}
+
 /*Define the behavior when we register the target task*/
-int registeration(int pid){
-// check whether the task exist in the list
-   int exist = check_process_exist(pid);
-   if(exist){
-      // already in the list, do nothing
-      printk(KERN_WARNING "mp3: registeration already exist entry for pid %d\n", pid);
-      return -1;
-   }
+int registeration(int pid) {
+    unsigned long flag;
+    struct task_struct *linux_task = find_task_by_pid(pid);
+    if (linux_task == NULL) return 0;
+
+    work_proc_struct_t* work_proc = (work_proc_struct_t *)kmalloc(sizeof(work_proc_struct_t), GFP_KERNEL);
+    if(work_proc == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate kernel memory\n");
+        return -1;
+    }
+
+    printk(KERN_ALERT "[KERN_ALERT]: Register PID %d\n", pid);
+    work_proc->pid = pid;
+    work_proc->linux_task = linux_task;
+    work_proc->utilization = 0;
+    work_proc->major_page_fault = 0;
+    work_proc->minor_page_fault = 0;
+
+//// check whether the task exist in the list
+//   int exist = check_process_exist(pid);
+//   if(exist){
+//      // already in the list, do nothing
+//      printk(KERN_WARNING "mp3: registeration already exist entry for pid %d\n", pid);
+//      return 0;
+//   }
 
    // allocate new memory space
-    work_proc_struct_t* process = (work_proc_struct_t *)kmalloc(sizeof(work_proc_struct_t), GFP_KERNEL);
-   if(!process)
-   // check whether successfully allocate memory space
-   {
-      printk(KERN_WARNING "mp3: registeration malloc for new PCB failed\n");
+
+
+
+   // get the linux task structure
+    work_proc->linux_task = linux_task;
+   if(work_proc->linux_task == NULL){
+      printk(KERN_WARNING "mp3: registeration cannot find task with pid %d\n", pid);
       return 0;
    }
-   printk(KERN_DEBUG "mp3: registeration for pid %d\n", pid);
-   // get the linux task structure
-   process->linux_task = find_task_by_pid(pid);
-   if(process->linux_task == NULL){
-      printk(KERN_WARNING "mp3: registeration cannot find task with pid %d\n", pid);
-      return -1;
-   }
-   process->pid = pid;
-   process->major_page_fault = process->minor_page_fault = 0;
-   process->utilization = 0;
 
-   if(work_queue == NULL){
-       work_queue = create_singlethread_workqueue("workqueue");
-   }
-   queue_delayed_work(work_queue, &profiler_work, delay);
-   spin_lock(&lock);
-   // add the current task to the linked list
-   list_add(&process->list_node, &work_proc_struct_list);
-   spin_unlock(&lock);
-   return 0;
+
+    if(work_queue == NULL){
+        work_queue = create_singlethread_workqueue("workqueue");
+    }
+    queue_delayed_work(work_queue, &profiler_work, delay);
+    spin_lock_irqsave(&lock, flag);
+    // add the current task to the linked list
+    // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch10s05.html
+    list_add(&work_proc->list_node, &work_proc_struct_list);
+    spin_unlock_irqrestore(&lock, flag);
+    return 1;
 }
 
 /*Define the behavior when we unregister the target task*/
 int unregisteration(int pid){
     unsigned long flag;
-    work_proc_struct_t* cur;
-    work_proc_struct_t* tmp;
+//    work_proc_struct_t* cur;
+//    work_proc_struct_t* tmp;
    int a = 0;
    printk(KERN_DEBUG "mp3: unregisteration for pid %d\n", pid);
    // traversal all the node
     spin_lock_irqsave(&lock, flag);
-    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node) {
-        if (pid == cur->pid){
-            // remove list head
-            list_del(&cur->list_node);
-            // free the memory
-            kfree(cur);
-            printk(KERN_DEBUG "mp3: deregisteration delete for pid %d\n", pid);
-            a = 1;
-        }
-    }
+    work_proc_struct_t *work_proc = __get_work_proc_by_pid(pid);
+    list_del(&work_proc->list_node);
+//    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node) {
+//        if (pid == cur->pid){
+//            // remove list head
+//            list_del(&cur->list_node);
+//            // free the memory
+//            kfree(cur);
+//            printk(KERN_DEBUG "mp3: deregisteration delete for pid %d\n", pid);
+//            a = 1;
+//        }
+//    }
     spin_unlock_irqrestore(&lock, flag);
 
     if (list_empty(&work_proc_struct_list)) {

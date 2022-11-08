@@ -124,6 +124,8 @@ int reg_proc(char *buf) {
     work_proc->major_page_fault = 0;
     work_proc->minor_page_fault = 0;
 
+    // Reference: https://man7.org/linux/man-pages/man3/list.3.html
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-empty.html
     if (list_empty(&work_proc_struct_list))
         queue_delayed_work(wq, &profiler_work, delay);
 
@@ -152,12 +154,8 @@ int dereg_proc(char *buf) {
     list_del(&work_proc->list_node);
     spin_unlock_irqrestore(&lock, flag);
 
-    if (list_empty(&work_proc_struct_list)) {
-        // Reference: https://linuxtv.org/downloads/v4l-dvb-internals/device-drivers/API-cancel-delayed-work-sync.html
-        // Reference: https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
-        // Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/workqueue_8c.html
+    if (list_empty(&work_proc_struct_list))
         cancel_delayed_work_sync(&profiler_work);
-    }
 
     return 1;
 }
@@ -202,11 +200,11 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
 
 // mp1_init - Called when module is loaded
 int __init mp3_init(void) {
-   int index = 0;
-   int ret = 0;
-   #ifdef DEBUG
-   printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADING\n");
-   #endif
+    int ret = 0;
+    int i;
+    #ifdef DEBUG
+    printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADING\n");
+    #endif
 
     if ((proc_dir = proc_mkdir(DIRECTORY, NULL)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "\n");
@@ -247,8 +245,8 @@ int __init mp3_init(void) {
     memset(vbuf, -1, MAX_VBUFFER);
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
-    for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
-        SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
+    for (i = 0; i < MAX_VBUFFER; i+=PAGE_SIZE) {
+        SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + i)));
     }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
@@ -270,7 +268,7 @@ rm_proc_entry:
 void __exit mp3_exit(void) {
     unsigned long flag;
     work_proc_struct_t *pos, *n;
-    int index = 0;
+    int i;
     #ifdef DEBUG
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADING\n");
     #endif
@@ -282,9 +280,11 @@ void __exit mp3_exit(void) {
     cdev_del(&cdev);
     unregister_chrdev_region(dev, 1);
 
-    if (delayed_work_pending(&profiler_work)) {
+    if (delayed_work_pending(&profiler_work))
+        // Reference: https://linuxtv.org/downloads/v4l-dvb-internals/device-drivers/API-cancel-delayed-work-sync.html
+        // Reference: https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
+        // Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/workqueue_8c.html
         cancel_delayed_work_sync(&profiler_work);
-    }
     destroy_workqueue(wq);
 
     spin_lock_irqsave(&lock, flag);
@@ -295,13 +295,13 @@ void __exit mp3_exit(void) {
     spin_unlock_irqrestore(&lock, flag);
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
-    for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
-        ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
+    for (i = 0; i < MAX_VBUFFER; i+=PAGE_SIZE) {
+        ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + i)));
     }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADED\n");
 }
 
-// Register init and exit funtions
+// Register init and exit functions
 module_init(mp3_init);
 module_exit(mp3_exit);

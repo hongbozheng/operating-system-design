@@ -42,9 +42,6 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define MAJOR_NUM 423
 #define DEVICE_NAME "cdev"
 #define NUM_PAGE 128
-// max buf size
-#define MAX_BUF 4096
-// file and dir name
 #define MAX_VBUFFER (4 * 128 * 1024)
 #define REGISTRATION 'R'
 #define DE_REGISTRATION 'U'
@@ -86,8 +83,7 @@ static const struct file_operations cdev_fops = {
         .release = NULL,
 };
 
-struct workqueue_struct *wq; //*work_queue;
-//vmalloc buffer
+struct workqueue_struct *wq;
 static unsigned long *vbuf;
 
 #endif

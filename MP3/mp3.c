@@ -74,6 +74,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
         byte_read += sprintf(kbuf+byte_read, "PID: %d\n", work_proc->pid);
     }
     spin_unlock_irqrestore(&lock, flag);
+
     kbuf[byte_read] = '\0';
 
     cpy_kernel_byte = copy_to_user(buffer, kbuf, byte_read);

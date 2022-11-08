@@ -10,14 +10,13 @@
 unsigned long delay;
 
 // linked list which will be used to store all the task
-struct list_head work_proc_struct_list;
+//struct list_head work_proc_struct_list;
 
 void profiler_work_function(struct work_struct *work);
 DECLARE_DELAYED_WORK(profiler_work, &profiler_work_function);
-struct workqueue_struct* work_queue = NULL;
 
-//vmalloc buffer
-unsigned long *vbuf;
+
+
 
 unsigned vbuf_ptr = 0;
 
@@ -285,21 +284,41 @@ int __init mp3_init(void) {
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-init.html
     cdev_init(&cdev, &cdev_fops);
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-add.html
-    cdev_add(&cdev, dev, 1);
+    if ((ret = cdev_add(&cdev, dev, 1)) < 0) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to add character device\n");
+        goto unreg_cdev;
+    }
 
-    // init the spinning lock
-    spin_lock_init(&lock);
-    // Init entry to profile work callback
+    if ((wq = create_workqueue("work_queue")) == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to create workqueue\n");
+        ret = -ENOMEM;
+        goto rm_cdev;
+    }
+
+    if ((vbuf = vmalloc(MAX_VBUFFER)) == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate virtually contiguous memory\n");
+        ret = -ENOMEM;
+        goto rm_wq;
+    }
+    memset(vbuf, -1, MAX_VBUFFER);
+
     work_queue = NULL;
-    //create vbuffer
-	vbuf = vmalloc(MAX_VBUFFER);
-	memset(vbuf, -1, MAX_VBUFFER);
+
 	for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
       SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
 	}
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
     return 0;
+
+rm_wq:
+    destroy_workqueue(wq);
+
+rm_cdev:
+    cdev_del(&cdev);
+
+unreg_cdev:
+    unregister_chrdev_region(dev, 1);
 
 rm_proc_entry:
     remove_proc_entry(FILENAME, proc_dir);

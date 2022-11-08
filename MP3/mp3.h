@@ -43,7 +43,8 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define MAJOR_NUM 423
 #define DEVICE_NAME "cdev"
 
-LIST_HEAD(work_proc_struct_list);
+static LIST_HEAD(work_proc_struct_list);
+static DEFINE_SPINLOCK(lock);
 
 typedef struct work_proc_struct {
     struct task_struct *linux_task;
@@ -54,7 +55,6 @@ typedef struct work_proc_struct {
     unsigned long minor_page_fault;
 } work_proc_struct_t;
 
-static spinlock_t lock;
 static struct proc_dir_entry *proc_dir, *proc_entry;
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset);
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *data);
@@ -73,5 +73,8 @@ static const struct file_operations cdev_fops = {
         .release = mp3_cdev_close,
         .mmap = mp3_cdev_mmap
 };
+struct workqueue_struct *wq, *work_queue;
+//vmalloc buffer
+static unsigned long *vbuf;
 
 #endif

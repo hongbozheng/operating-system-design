@@ -47,6 +47,8 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define MAX_BUF 4096
 // file and dir name
 #define MAX_VBUFFER (4 * 128 * 1024)
+#define REGISTRATION 'R'
+#define DE_REGISTRATION 'U'
 
 static LIST_HEAD(work_proc_struct_list);
 static DEFINE_SPINLOCK(lock);

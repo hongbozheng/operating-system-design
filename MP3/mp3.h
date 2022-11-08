@@ -38,24 +38,25 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define DEBUG
 #define FILENAME "status"
 #define DIRECTORY "mp3"
-#define DELAY 50
+#define SAMPLE 20
+#define DELAY_MS 1000/SAMPLE
 #define MAJOR_NUM 423
 #define DEVICE_NAME "cdev"
 #define NUM_PAGE 128
-#define MAX_VBUFFER (4 * 128 * 1024)
+#define MAX_VBUF_SIZE NUM_PAGE*4*1024
 #define REGISTRATION 'R'
 #define DE_REGISTRATION 'U'
 #define PID_OFFSET 2
 
 static LIST_HEAD(work_proc_struct_list);
 static DEFINE_SPINLOCK(lock);
-static void update_mem_status(struct work_struct *work);
-static DECLARE_DELAYED_WORK(profiler_work, &update_mem_status);
+static void update_data(struct work_struct *work);
+static DECLARE_DELAYED_WORK(profiler_work, &update_data);
 
 typedef struct work_proc_struct {
     struct task_struct *linux_task;
     struct list_head list_node;
-    unsigned int pid;
+    pid_t pid;
     unsigned long utilization;
     unsigned long major_page_fault;
     unsigned long minor_page_fault;
@@ -71,6 +72,7 @@ static const struct proc_ops proc_fops = {
 
 static dev_t dev;
 struct cdev cdev;
+// Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch13s02.html
 static int cdev_mmap(struct file *file, struct vm_area_struct *vma);
 // Reference: https://elixir.bootlin.com/linux/latest/source/include/linux/fs.h#L2093
 // Reference: https://tldp.org/LDP/lkmpg/2.4/html/c577.htm
@@ -84,6 +86,8 @@ static const struct file_operations cdev_fops = {
 };
 
 struct workqueue_struct *wq;
+static unsigned long delay_jiffies;
 static unsigned long *vbuf;
+static unsigned vbuf_ptr = 0;
 
 #endif

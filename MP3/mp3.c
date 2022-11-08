@@ -2,58 +2,58 @@
 
 #include "mp3.h"
 
-unsigned long delay;
-
-unsigned vbuf_ptr = 0;
-
 static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
-    unsigned long index = 0;
-    unsigned long pfn;
+    unsigned long i, pfn;
     unsigned long size = vma->vm_end - vma->vm_start;
+    int ret;
 
-	if (vma->vm_end - vma->vm_start > MAX_VBUFFER) {
-		printk(KERN_WARNING "mp3: mmap length exceed max vbuf\n");
-		return -1;
+	if (size > MAX_VBUF_SIZE) {
+		printk(KERN_ALERT "[KERN_ALERT]: MMAP size exceed MAX_VBUF_SIZE\n");
+		return -EINVAL;
 	}
    
-    for (index = 0; index < size; index +=PAGE_SIZE) {
-        pfn = vmalloc_to_pfn((void *)(((unsigned long)vbuf) + index));
-            if (remap_pfn_range(vma, vma->vm_start+index, pfn, PAGE_SIZE, vma->vm_page_prot)) {
-                printk(KERN_ALERT "MP3 module could not perform mmap!\n");
-                return -1;
-            }
+    for (i = 0; i < size; i +=PAGE_SIZE) {
+        pfn = vmalloc_to_pfn((void *)(((unsigned long)vbuf) + i));
+        // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/mm/memory.c#L2452
+        // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-remap-pfn-range.html
+        if ((ret = remap_pfn_range(vma, vma->vm_start+i, pfn, PAGE_SIZE, vma->vm_page_prot)) < 0) {
+            printk(KERN_ALERT "[KERN_ALERT]: Fail to remap kernel memory to userspace\n");
+            return ret;
         }
+    }
+
     return 0;
 }
 
-void update_mem_status(struct work_struct *work) {
+void update_data(struct work_struct *work) {
     unsigned long flag;
-    work_proc_struct_t *cur;
-    unsigned long major_fault_sum, minor_fault_sum, utilization_sum, utime, stime;
-    major_fault_sum = minor_fault_sum = utilization_sum = 0;
+    work_proc_struct_t *work_proc;
+    unsigned long ttl_min_flt, ttl_maj_flt, ttl_util, utime, stime;
+    ttl_min_flt = ttl_maj_flt = ttl_util = 0;
 
     spin_lock_irqsave(&lock, flag);
-    list_for_each_entry(cur, &work_proc_struct_list, list_node){
-        if(0 == get_cpu_use(cur->pid, &cur->minor_page_fault, &cur->major_page_fault, &utime, &stime)){
-            // get data success
-            major_fault_sum += cur->major_page_fault;
-            minor_fault_sum += cur->minor_page_fault;
-            cur->utilization = utime + stime;
-            utilization_sum += cur->utilization;
+    list_for_each_entry(work_proc, &work_proc_struct_list, list_node){
+        if (get_cpu_use(work_proc->pid, &work_proc->minor_page_fault, &work_proc->major_page_fault,
+                        &utime, &stime) == 0) {
+            work_proc->utilization = utime + stime;
+            ttl_util += work_proc->utilization;
+            ttl_maj_flt += work_proc->major_page_fault;
+            ttl_min_flt += work_proc->minor_page_fault;
         }
     }
     spin_unlock_irqrestore(&lock, flag);
-    vbuf[vbuf_ptr++] = jiffies;
-    vbuf[vbuf_ptr++] = minor_fault_sum;
-    vbuf[vbuf_ptr++] = major_fault_sum;
-    vbuf[vbuf_ptr++] = utilization_sum;
 
-    if (vbuf_ptr >= MAX_VBUFFER) {
-        printk(KERN_DEBUG "mp3: profile vmalloc buffer full, warp around\n");
+    vbuf[vbuf_ptr++] = jiffies;
+    vbuf[vbuf_ptr++] = ttl_min_flt;
+    vbuf[vbuf_ptr++] = ttl_maj_flt;
+    vbuf[vbuf_ptr++] = ttl_util;
+
+    if (vbuf_ptr >= MAX_VBUF_SIZE) {
+        printk(KERN_ALERT "[KERN_ALERT]: PROFILE BUFFER FULL, RESET PROFILE BUFFER PTR\n");
         vbuf_ptr = 0;
     }
 
-    queue_delayed_work(wq, &profiler_work, delay);
+    queue_delayed_work(wq, &profiler_work, delay_jiffies);
 }
 
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset) {
@@ -127,7 +127,7 @@ int reg_proc(char *buf) {
     // Reference: https://man7.org/linux/man-pages/man3/list.3.html
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-empty.html
     if (list_empty(&work_proc_struct_list))
-        queue_delayed_work(wq, &profiler_work, delay);
+        queue_delayed_work(wq, &profiler_work, delay_jiffies);
 
     spin_lock_irqsave(&lock, flag);
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-add-tail.html
@@ -235,17 +235,18 @@ int __init mp3_init(void) {
         ret = -ENOMEM;
         goto rm_cdev;
     }
-    delay = msecs_to_jiffies(DELAY);
+    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/jiffies.h#L363
+    delay_jiffies = msecs_to_jiffies(DELAY_MS);
 
-    if ((vbuf = vmalloc(MAX_VBUFFER)) == NULL) {
+    if ((vbuf = vmalloc(MAX_VBUF_SIZE)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate virtually contiguous memory\n");
         ret = -ENOMEM;
         goto rm_wq;
     }
-    memset(vbuf, -1, MAX_VBUFFER);
+    memset(vbuf, -1, MAX_VBUF_SIZE);
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
-    for (i = 0; i < MAX_VBUFFER; i+=PAGE_SIZE) {
+    for (i = 0; i < MAX_VBUF_SIZE; i+=PAGE_SIZE) {
         SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + i)));
     }
 
@@ -295,7 +296,7 @@ void __exit mp3_exit(void) {
     spin_unlock_irqrestore(&lock, flag);
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
-    for (i = 0; i < MAX_VBUFFER; i+=PAGE_SIZE) {
+    for (i = 0; i < MAX_VBUF_SIZE; i+=PAGE_SIZE) {
         ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + i)));
     }
 

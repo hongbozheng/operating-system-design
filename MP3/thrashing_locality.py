@@ -32,8 +32,8 @@ def _2_rand_axs(pro_1_data):
         assert file_len == len(time) == len(min_flt) == len(maj_flt) == len(util)
         print('[INFO]: Finish reading file %s'%pro_1_data)
 
-        start_time = time[0]
-        time = [t - start_time for t in time]
+        # start_time = time[0]
+        # time = [t - start_time for t in time]
         total_flt = [min_f+maj_f for min_f,maj_f in zip(min_flt, maj_flt)]
         cumulative_flt = [sum(total_flt[0:x:1]) for x in range(0, len(total_flt))]
         if DEBUG:
@@ -79,8 +79,8 @@ def _1_rand_axs_1_loc_axs(pro_2_data):
         assert file_len == len(time) == len(min_flt) == len(maj_flt) == len(util)
         print('[INFO]: Finish reading file %s'%pro_2_data)
 
-        start_time = time[0]
-        time = [t-start_time for t in time]
+        # start_time = time[0]
+        # time = [t-start_time for t in time]
         total_flt = [min_f+maj_f for min_f,maj_f in zip(min_flt,maj_flt)]
         cumulative_flt = [sum(total_flt[0:x:1]) for x in range(0, len(total_flt))]
         if DEBUG:

@@ -2,11 +2,6 @@
 
 #include "mp3.h"
 
-// max buf size
-#define MAX_BUF 4096
-// file and dir name
-#define MAX_VBUFFER (4 * 128 * 1024)
-
 unsigned long delay;
 
 // linked list which will be used to store all the task
@@ -140,11 +135,11 @@ int check_process_exist(int pid){
 }
 
 work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
-    work_proc_struct_t *work_proc;
+    work_proc_struct_t *work_proc = NULL;
     list_for_each_entry(work_proc, &work_proc_struct_list, list_node) {
         if (work_proc->pid == pid) return work_proc;
     }
-    return NULL;
+    return work_proc;
 }
 
 /*Define the behavior when we register the target task*/

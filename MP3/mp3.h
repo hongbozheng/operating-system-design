@@ -52,8 +52,8 @@ MODULE_DESCRIPTION("CS-423 MP3");
 
 static LIST_HEAD(work_proc_struct_list);
 static DEFINE_SPINLOCK(lock);
-static void profiler_work_function(struct work_struct *work);
-static DECLARE_DELAYED_WORK(profiler_work, &profiler_work_function);
+static void update_mem_status(struct work_struct *work);
+static DECLARE_DELAYED_WORK(profiler_work, &update_mem_status);
 
 typedef struct work_proc_struct {
     struct task_struct *linux_task;
@@ -86,7 +86,7 @@ static const struct file_operations cdev_fops = {
         .release = NULL,
 };
 
-struct workqueue_struct *wq, *work_queue;
+struct workqueue_struct *wq; //*work_queue;
 //vmalloc buffer
 static unsigned long *vbuf;
 

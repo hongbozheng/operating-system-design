@@ -26,7 +26,7 @@ static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
     return 0;
 }
 
-void profiler_work_function(struct work_struct *work) {
+void update_mem_status(struct work_struct *work) {
     unsigned long flag;
     work_proc_struct_t *cur;
     unsigned long major_fault_sum, minor_fault_sum, utilization_sum, utime, stime;
@@ -34,7 +34,6 @@ void profiler_work_function(struct work_struct *work) {
 
     spin_lock_irqsave(&lock, flag);
     list_for_each_entry(cur, &work_proc_struct_list, list_node){
-        // traversal all the node in the list and write to the buffer
         if(0 == get_cpu_use(cur->pid, &cur->minor_page_fault, &cur->major_page_fault, &utime, &stime)){
             // get data success
             major_fault_sum += cur->major_page_fault;
@@ -44,7 +43,6 @@ void profiler_work_function(struct work_struct *work) {
         }
     }
     spin_unlock_irqrestore(&lock, flag);
-    // save the information to the memory buffer
     vbuf[vbuf_ptr++] = jiffies;
     vbuf[vbuf_ptr++] = minor_fault_sum;
     vbuf[vbuf_ptr++] = major_fault_sum;
@@ -54,9 +52,8 @@ void profiler_work_function(struct work_struct *work) {
         printk(KERN_DEBUG "mp3: profile vmalloc buffer full, warp around\n");
         vbuf_ptr = 0;
     }
-    if (work_queue) {
-        queue_delayed_work(work_queue, &profiler_work, delay);
-    }
+
+    queue_delayed_work(wq, &profiler_work, delay);
 }
 
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset) {
@@ -127,14 +124,13 @@ int reg_proc(char *buf) {
     work_proc->major_page_fault = 0;
     work_proc->minor_page_fault = 0;
 
-    if (work_queue == NULL) {
-        work_queue = create_singlethread_workqueue("workqueue");
-    }
-    queue_delayed_work(work_queue, &profiler_work, delay);
+    if (list_empty(&work_proc_struct_list))
+        queue_delayed_work(wq, &profiler_work, delay);
 
     spin_lock_irqsave(&lock, flag);
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-add-tail.html
     // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch10s05.html
-    list_add(&work_proc->list_node, &work_proc_struct_list);
+    list_add_tail(&work_proc->list_node, &work_proc_struct_list);
     spin_unlock_irqrestore(&lock, flag);
 
     return 1;
@@ -157,11 +153,10 @@ int dereg_proc(char *buf) {
     spin_unlock_irqrestore(&lock, flag);
 
     if (list_empty(&work_proc_struct_list)) {
-        cancel_delayed_work(&profiler_work);
-        flush_workqueue(work_queue);
-        destroy_workqueue(work_queue);
-        work_queue = NULL;
-        printk(KERN_INFO "mp3: deleted work queue");
+        // Reference: https://linuxtv.org/downloads/v4l-dvb-internals/device-drivers/API-cancel-delayed-work-sync.html
+        // Reference: https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
+        // Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/workqueue_8c.html
+        cancel_delayed_work_sync(&profiler_work);
     }
 
     return 1;
@@ -224,8 +219,6 @@ int __init mp3_init(void) {
         return -ENOMEM;
     }
 
-    delay = msecs_to_jiffies(DELAY);
-
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-alloc-chrdev-region.html
     if ((ret = alloc_chrdev_region(&dev, 0, 1, DEVICE_NAME)) < 0) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate character device\n");
@@ -244,6 +237,7 @@ int __init mp3_init(void) {
         ret = -ENOMEM;
         goto rm_cdev;
     }
+    delay = msecs_to_jiffies(DELAY);
 
     if ((vbuf = vmalloc(MAX_VBUFFER)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate virtually contiguous memory\n");
@@ -251,8 +245,6 @@ int __init mp3_init(void) {
         goto rm_wq;
     }
     memset(vbuf, -1, MAX_VBUFFER);
-
-    work_queue = NULL;
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
     for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
@@ -290,15 +282,12 @@ void __exit mp3_exit(void) {
     cdev_del(&cdev);
     unregister_chrdev_region(dev, 1);
 
-    if (work_queue != NULL){
-        cancel_delayed_work(&profiler_work);
-		flush_workqueue(work_queue);
-		destroy_workqueue(work_queue);
-        work_queue = NULL;
+    if (delayed_work_pending(&profiler_work)) {
+        cancel_delayed_work_sync(&profiler_work);
     }
+    destroy_workqueue(wq);
 
     spin_lock_irqsave(&lock, flag);
-    // delete all the entries in the list
     list_for_each_entry_safe(pos, n, &work_proc_struct_list, list_node) {
         list_del(&pos->list_node);
         kfree(pos);

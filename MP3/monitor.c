@@ -18,13 +18,13 @@ static void *buf_init(char *fname) {
 
     if(buf_fd == -1) {
         buf_len = NPAGES * getpagesize();
-        if((buf_fd=open(fname, O_RDWR|O_SYNC)) < 0) {
+        if ((buf_fd=open(fname, O_RDWR|O_SYNC)) < 0) {
             printf("file open error. %s\n", fname);
             return NULL;
         }
     }
     kadr = mmap(0, buf_len, PROT_READ|PROT_WRITE, MAP_SHARED, buf_fd, 0);
-    if(kadr == MAP_FAILED){
+    if (kadr == MAP_FAILED) {
         printf("buf file open error.\n");
         return NULL;
     }
@@ -34,7 +34,7 @@ static void *buf_init(char *fname) {
 
 // This function closes the opened character device file.
 static void buf_exit() {
-    if(buf_fd != -1) {
+    if (buf_fd != -1) {
         close(buf_fd);
         buf_fd = -1;
     }
@@ -47,33 +47,33 @@ int main(int argc, char* argv[]) {
 
     // Open the char device and mmap()
     buf = buf_init("node");
-    if(!buf)
+    if (!buf)
         return -1;
 
     // Read and print profiled data
-    for(index=0; index<BUFD_MAX; index++)
+    for (index=0; index<BUFD_MAX; index++)
         if(buf[index] != -1) break;
 
     i = 0;
-    while(buf[index] != -1) {
+    while (buf[index] != -1) {
         printf("%ld ", buf[index]);
         buf[index++] = -1;
-        if(index >= BUFD_MAX)
+        if (index >= BUFD_MAX)
             index = 0;
 
         printf("%ld ", buf[index]);
         buf[index++] = -1;
-        if(index >= BUFD_MAX)
+        if (index >= BUFD_MAX)
             index = 0;
 
         printf("%ld ", buf[index]);
         buf[index++] = -1;
-        if(index >= BUFD_MAX)
+        if (index >= BUFD_MAX)
             index = 0;
 
         printf("%ld\n", buf[index]);
         buf[index++] = -1;
-        if(index >= BUFD_MAX)
+        if (index >= BUFD_MAX)
             index = 0;
         i++;
     }

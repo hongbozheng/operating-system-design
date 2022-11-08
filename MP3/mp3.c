@@ -50,35 +50,41 @@ static int mp3_cdev_mmap(struct file *f, struct vm_area_struct *vma)
 }
 
 /*Define the behavior when the proc file is read by the user space program*/
-static ssize_t proc_read (struct file *file, char __user *buffer, size_t size, loff_t *offset) {
-   unsigned long cpy_kernel_byte;
-   char *kbuf;
-   int copied = 0;
-    work_proc_struct_t* cur;
-   printk(KERN_DEBUG "mp3: receive read request\n");
-   // check reenter
+static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset) {
+    unsigned long flag, cpy_kernel_byte;
+    char *kbuf;
+    ssize_t byte_read;
+    work_proc_struct_t* work_proc;
+
    if(*offset > 0) return 0;
 
-   // allocate memory and init it
-   kbuf = (char *)kmalloc(MAX_BUF * sizeof(char), GFP_KERNEL);
-   memset(kbuf, 0, MAX_BUF * sizeof(char));
-
-   spin_lock(&lock);
-   // todo
-   list_for_each_entry(cur, &work_proc_struct_list, list_node){
-        // traversal all the node in the list and write to the buffer
-        copied += sprintf(kbuf + copied, "PID: %d\n", cur->pid);
-        printk(KERN_DEBUG "mp3: writing PID: %d\n", cur->pid);
+   if (!access_ok(buffer, size)) {
+       printk(KERN_ALERT "[KERN_ALERT]: User Buffer is NOT WRITABLE\n");
+       return -EINVAL;
    }
-   spin_unlock(&lock);
-   // add end sign
-   kbuf[copied] = '\0';
-   printk(KERN_DEBUG "mp3: read callback with content %s\n", kbuf);
-   // copy the result to the user space buffer
-   cpy_kernel_byte = copy_to_user(buffer, kbuf, copied);
-   kfree(kbuf);
-   *offset = copied;
-   return copied;
+
+    kbuf = (char *)kmalloc(size, GFP_KERNEL);
+    if (kbuf == NULL) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate kernel memory\n");
+        return -ENOMEM;
+    }
+
+    spin_lock_irqsave(&lock, flag);
+    list_for_each_entry(work_proc, &work_proc_struct_list, list_node){
+        byte_read += sprintf(kbuf+byte_read, "PID: %d\n", work_proc->pid);
+    }
+    spin_unlock_irqrestore(&lock, flag);
+    kbuf[byte_read] = '\0';
+
+    cpy_kernel_byte = copy_to_user(buffer, kbuf, byte_read);
+    if (cpy_kernel_byte != 0) {
+        printk(KERN_ALERT "[KEN_ALERT]: copy_from_user fail\n");
+    }
+
+    kfree(kbuf);
+
+    *offset = byte_read;
+    return byte_read;
 }
 
 
@@ -112,26 +118,6 @@ void profiler_work_function(struct work_struct *work) {
    if (work_queue) {
 		queue_delayed_work(work_queue, &profiler_work, delay);
 	}
-}
-
-/*check whether the target task exists in the task linked list*/
-int check_process_exist(int pid){
-    work_proc_struct_t* cur;
-    work_proc_struct_t* tmp;
-    // indicate whether we find the task
-    int flag = 0;
-    // lock the spinning lock
-    spin_lock(&lock);
-    // travesal all the node
-    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node){
-        //check the pid
-        if(cur->pid == pid){
-            flag = 1;
-            break;
-        }
-    }
-    spin_unlock(&lock);
-    return flag;
 }
 
 work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
@@ -179,7 +165,7 @@ int reg_proc(char *buf) {
 }
 
 /*Define the behavior when we unregister the target task*/
-int dereg_proc(char *buf){
+int dereg_proc(char *buf) {
     pid_t pid;
     unsigned long flag;
 
@@ -207,7 +193,7 @@ int dereg_proc(char *buf){
 }
 
 /*Define the behavior when the proc file is wriiter by the user space program*/
-static ssize_t proc_write (struct file *file, const char __user *buffer, size_t size, loff_t *offset) {
+static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offset) {
     unsigned long cpy_usr_byte;
     char *kbuf;
 
@@ -316,8 +302,7 @@ rm_proc_entry:
 }
 
 // mp3_exit - Called when module is unloaded
-void __exit mp3_exit(void)
-{
+void __exit mp3_exit(void) {
     unsigned long flag;
     work_proc_struct_t *pos, *n;
     int index = 0;

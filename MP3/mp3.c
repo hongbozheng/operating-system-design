@@ -209,6 +209,7 @@ int unregisteration(int pid){
     spin_lock_irqsave(&lock, flag);
     work_proc_struct_t *work_proc = __get_work_proc_by_pid(pid);
     list_del(&work_proc->list_node);
+    a=1;
 //    list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node) {
 //        if (pid == cur->pid){
 //            // remove list head
@@ -350,13 +351,20 @@ rm_proc_entry:
 // mp3_exit - Called when module is unloaded
 void __exit mp3_exit(void)
 {
-    work_proc_struct_t* cur;
-    work_proc_struct_t* tmp;
+    unsigned long flag;
+    work_proc_struct_t *pos, *n;
     int index = 0;
     #ifdef DEBUG
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADING\n");
     #endif
     // Insert your code here ...
+
+    remove_proc_entry(FILENAME, proc_dir);
+    remove_proc_entry(DIRECTORY, NULL);
+
+    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-del.html
+    cdev_del(&cdev);
+    unregister_chrdev_region(dev, 1);
 
     if (work_queue != NULL){
         cancel_delayed_work(&profiler_work);
@@ -365,27 +373,20 @@ void __exit mp3_exit(void)
         work_queue = NULL;
     }
 
-   spin_lock(&lock);
-   // delete all the entries in the list
-   list_for_each_entry_safe(cur, tmp, &work_proc_struct_list, list_node){
-         printk(KERN_DEBUG "mp3: remove pid: %d from list \n", cur->pid);
-         //remove list head
-         list_del(&cur->list_node);
-         // free the memory
-         kfree(cur);
-   }
-   spin_unlock(&lock);
+    spin_lock_irqsave(&lock, flag);
+    // delete all the entries in the list
+    list_for_each_entry_safe(pos, n, &work_proc_struct_list, list_node) {
+        list_del(&pos->list_node);
+        kfree(pos);
+    }
+    spin_unlock_irqrestore(&lock, flag);
+
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
     for(index = 0; index < MAX_VBUFFER; index+=PAGE_SIZE){
         ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + index)));
     }
-   // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-del.html
-   cdev_del(&cdev);
-	unregister_chrdev_region(dev, 1);
-   remove_proc_entry(FILENAME, proc_dir);
-   remove_proc_entry(DIRECTORY, NULL);
 
-   printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADED\n");
+    printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADED\n");
 }
 
 // Register init and exit funtions

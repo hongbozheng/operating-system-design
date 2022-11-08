@@ -4,31 +4,12 @@
 
 unsigned long delay;
 
-// linked list which will be used to store all the task
-//struct list_head work_proc_struct_list;
-
 void profiler_work_function(struct work_struct *work);
 DECLARE_DELAYED_WORK(profiler_work, &profiler_work_function);
 
-
-
-
 unsigned vbuf_ptr = 0;
 
-int mp3_cdev_open(struct inode* inode, struct file* file) 
-{
-  return 0;
-}
-
-int mp3_cdev_close(struct inode* inode, struct file* file) 
-{
-  return 0;
-}
-
-// cdev mmap method, map each vmalloced space to device space,
-// so that it can be contiguous
-static int mp3_cdev_mmap(struct file *f, struct vm_area_struct *vma)
-{
+static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
 	unsigned long index = 0;
    unsigned long pfn;
    unsigned long size = vma->vm_end - vma->vm_start;
@@ -49,7 +30,38 @@ static int mp3_cdev_mmap(struct file *f, struct vm_area_struct *vma)
 	return 0;
 }
 
-/*Define the behavior when the proc file is read by the user space program*/
+void profiler_work_function(struct work_struct *work) {
+    work_proc_struct_t *cur;
+    unsigned long major_fault_sum, minor_fault_sum, utilization_sum, utime, stime;
+    major_fault_sum = minor_fault_sum = utilization_sum = 0;
+
+    spin_lock(&lock);
+    list_for_each_entry(cur, &work_proc_struct_list, list_node){
+        // traversal all the node in the list and write to the buffer
+        if(0 == get_cpu_use(cur->pid, &cur->minor_page_fault, &cur->major_page_fault, &utime, &stime)){
+            // get data success
+            major_fault_sum += cur->major_page_fault;
+            minor_fault_sum += cur->minor_page_fault;
+            cur->utilization = utime + stime;
+            utilization_sum += cur->utilization;
+        }
+    }
+    spin_unlock(&lock);
+    // save the information to the memory buffer
+    vbuf[vbuf_ptr++] = jiffies;
+    vbuf[vbuf_ptr++] = minor_fault_sum;
+    vbuf[vbuf_ptr++] = major_fault_sum;
+    vbuf[vbuf_ptr++] = utilization_sum;
+
+    if (vbuf_ptr >= MAX_VBUFFER) {
+        printk(KERN_DEBUG "mp3: profile vmalloc buffer full, warp around\n");
+        vbuf_ptr = 0;
+    }
+    if (work_queue) {
+        queue_delayed_work(work_queue, &profiler_work, delay);
+    }
+}
+
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset) {
     unsigned long flag, cpy_kernel_byte;
     char *kbuf;
@@ -86,39 +98,6 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 
     *offset = byte_read;
     return byte_read;
-}
-
-
-void profiler_work_function(struct work_struct *work) {
-    work_proc_struct_t *cur;
-   unsigned long major_fault_sum, minor_fault_sum, utilization_sum, utime, stime;
-   major_fault_sum = minor_fault_sum = utilization_sum = 0;
-
-   spin_lock(&lock);
-   list_for_each_entry(cur, &work_proc_struct_list, list_node){
-        // traversal all the node in the list and write to the buffer
-      if(0 == get_cpu_use(cur->pid, &cur->minor_page_fault, &cur->major_page_fault, &utime, &stime)){
-         // get data success
-		   major_fault_sum += cur->major_page_fault;
-         minor_fault_sum += cur->minor_page_fault;
-         cur->utilization = utime + stime;
-         utilization_sum += cur->utilization;
-		}
-   }
-   spin_unlock(&lock);
-   // save the information to the memory buffer
-	vbuf[vbuf_ptr++] = jiffies;
-   vbuf[vbuf_ptr++] = minor_fault_sum;
-   vbuf[vbuf_ptr++] = major_fault_sum;
-   vbuf[vbuf_ptr++] = utilization_sum;
-
-   if (vbuf_ptr >= MAX_VBUFFER) {
-      printk(KERN_DEBUG "mp3: profile vmalloc buffer full, warp around\n");
-      vbuf_ptr = 0;
-   }
-   if (work_queue) {
-		queue_delayed_work(work_queue, &profiler_work, delay);
-	}
 }
 
 work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
@@ -165,7 +144,6 @@ int reg_proc(char *buf) {
     return 1;
 }
 
-/*Define the behavior when we unregister the target task*/
 int dereg_proc(char *buf) {
     pid_t pid;
     unsigned long flag;
@@ -193,7 +171,6 @@ int dereg_proc(char *buf) {
     return 1;
 }
 
-/*Define the behavior when the proc file is wriiter by the user space program*/
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offset) {
     unsigned long cpy_usr_byte;
     char *kbuf;
@@ -239,7 +216,6 @@ int __init mp3_init(void) {
    #ifdef DEBUG
    printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADING\n");
    #endif
-   // Insert your code here ...
 
     if ((proc_dir = proc_mkdir(DIRECTORY, NULL)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "\n");
@@ -310,7 +286,6 @@ void __exit mp3_exit(void) {
     #ifdef DEBUG
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADING\n");
     #endif
-    // Insert your code here ...
 
     remove_proc_entry(FILENAME, proc_dir);
     remove_proc_entry(DIRECTORY, NULL);

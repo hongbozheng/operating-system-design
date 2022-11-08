@@ -70,17 +70,21 @@ static const struct proc_ops proc_fops = {
         .proc_read = proc_read,
         .proc_write = proc_write,
 };
+
 static dev_t dev;
 struct cdev cdev;
-int mp3_cdev_open(struct inode* inode, struct file* file);
-int mp3_cdev_close(struct inode* inode, struct file* file);
-static int mp3_cdev_mmap(struct file *f, struct vm_area_struct *vma);
+static int cdev_mmap(struct file *file, struct vm_area_struct *vma);
+// Reference: https://elixir.bootlin.com/linux/latest/source/include/linux/fs.h#L2093
+// Reference: https://tldp.org/LDP/lkmpg/2.4/html/c577.htm
+// Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/structfile__operations.html
+// Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch03s03.html
 static const struct file_operations cdev_fops = {
         .owner = THIS_MODULE,
-        .open = mp3_cdev_open,
-        .release = mp3_cdev_close,
-        .mmap = mp3_cdev_mmap
+        .mmap = cdev_mmap,
+        .open = NULL,
+        .release = NULL,
 };
+
 struct workqueue_struct *wq, *work_queue;
 //vmalloc buffer
 static unsigned long *vbuf;

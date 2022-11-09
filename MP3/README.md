@@ -5,14 +5,10 @@ Deadline --- Friday, November, 11th, 11:59PM
 Build a kernel-level module that harvests the page fault and utilization information of registered tasks and exposes
 them by using a memory buffer that is directly mapped into the virtual address space of the monitor process
 
----
-
 ## Project Setup
 This project depends on the installation of the following essenstial packages:
 
 None
-
----
 
 ## Build Project
 With the project setup, build the command-line application as follow:
@@ -25,15 +21,11 @@ To clean up the project
 make clean
 ```
 
----
-
 ## Test Profiler Kernel Module
 Run the following command
 ```
 ./get_pro_data.bash
 ```
-
----
 
 ## Design
 

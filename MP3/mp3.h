@@ -38,12 +38,12 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define DEBUG
 #define FILENAME "status"
 #define DIRECTORY "mp3"
-#define SAMPLE 20
-#define DELAY_MS 1000/SAMPLE
 #define MAJOR_NUM 423
 #define DEVICE_NAME "cdev"
+#define SAMPLE 20
+#define DELAY_MS 1000/SAMPLE
 #define NUM_PAGE 128
-#define MAX_VBUF_SIZE NUM_PAGE*4*1024
+#define MAX_PROF_BUF_SIZE NUM_PAGE*4*1024
 #define REGISTRATION 'R'
 #define DE_REGISTRATION 'U'
 #define PID_OFFSET 2
@@ -51,7 +51,7 @@ MODULE_DESCRIPTION("CS-423 MP3");
 static LIST_HEAD(work_proc_struct_list);
 static DEFINE_SPINLOCK(lock);
 static void update_data(struct work_struct *work);
-static DECLARE_DELAYED_WORK(profiler_work, &update_data);
+static DECLARE_DELAYED_WORK(prof_work, &update_data);
 
 typedef struct work_proc_struct {
     struct task_struct *linux_task;
@@ -87,7 +87,7 @@ static const struct file_operations cdev_fops = {
 
 struct workqueue_struct *wq;
 static unsigned long delay_jiffies;
-static unsigned long *vbuf;
-static unsigned vbuf_ptr = 0;
+static unsigned long *prof_buf;
+static unsigned prof_buf_ptr = 0;
 
 #endif

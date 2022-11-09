@@ -7,13 +7,13 @@ static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
     unsigned long size = vma->vm_end - vma->vm_start;
     int ret;
 
-	if (size > MAX_VBUF_SIZE) {
-		printk(KERN_ALERT "[KERN_ALERT]: MMAP size exceed MAX_VBUF_SIZE\n");
+	if (size > MAX_PROF_BUF_SIZE) {
+		printk(KERN_ALERT "[KERN_ALERT]: MMAP size exceed MAX_PROF_BUF_SIZE\n");
 		return -EINVAL;
 	}
    
-    for (i = 0; i < size; i +=PAGE_SIZE) {
-        pfn = vmalloc_to_pfn((void *)(((unsigned long)vbuf) + i));
+    for (i = 0; i < size; i+=PAGE_SIZE) {
+        pfn = vmalloc_to_pfn((void *)(((unsigned long)prof_buf) + i));
         // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/mm/memory.c#L2452
         // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-remap-pfn-range.html
         if ((ret = remap_pfn_range(vma, vma->vm_start+i, pfn, PAGE_SIZE, vma->vm_page_prot)) < 0) {
@@ -43,17 +43,17 @@ void update_data(struct work_struct *work) {
     }
     spin_unlock_irqrestore(&lock, flag);
 
-    vbuf[vbuf_ptr++] = jiffies;
-    vbuf[vbuf_ptr++] = ttl_min_flt;
-    vbuf[vbuf_ptr++] = ttl_maj_flt;
-    vbuf[vbuf_ptr++] = ttl_util;
+    prof_buf[prof_buf_ptr++] = jiffies;
+    prof_buf[prof_buf_ptr++] = ttl_min_flt;
+    prof_buf[prof_buf_ptr++] = ttl_maj_flt;
+    prof_buf[prof_buf_ptr++] = ttl_util;
 
-    if (vbuf_ptr >= MAX_VBUF_SIZE) {
+    if (prof_buf_ptr >= MAX_PROF_BUF_SIZE) {
         printk(KERN_ALERT "[KERN_ALERT]: PROFILE BUFFER FULL, RESET PROFILE BUFFER PTR\n");
-        vbuf_ptr = 0;
+        prof_buf_ptr = 0;
     }
 
-    queue_delayed_work(wq, &profiler_work, delay_jiffies);
+    queue_delayed_work(wq, &prof_work, delay_jiffies);
 }
 
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset) {
@@ -127,7 +127,7 @@ int reg_proc(char *buf) {
     // Reference: https://man7.org/linux/man-pages/man3/list.3.html
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-empty.html
     if (list_empty(&work_proc_struct_list))
-        queue_delayed_work(wq, &profiler_work, delay_jiffies);
+        queue_delayed_work(wq, &prof_work, delay_jiffies);
 
     spin_lock_irqsave(&lock, flag);
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-add-tail.html
@@ -155,7 +155,7 @@ int dereg_proc(char *buf) {
     spin_unlock_irqrestore(&lock, flag);
 
     if (list_empty(&work_proc_struct_list))
-        cancel_delayed_work_sync(&profiler_work);
+        cancel_delayed_work_sync(&prof_work);
 
     return 1;
 }
@@ -238,16 +238,16 @@ int __init mp3_init(void) {
     // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/jiffies.h#L363
     delay_jiffies = msecs_to_jiffies(DELAY_MS);
 
-    if ((vbuf = vmalloc(MAX_VBUF_SIZE)) == NULL) {
+    if ((prof_buf = vmalloc(MAX_PROF_BUF_SIZE)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate virtually contiguous memory\n");
         ret = -ENOMEM;
         goto rm_wq;
     }
-    memset(vbuf, -1, MAX_VBUF_SIZE);
+    memset(prof_buf, -1, MAX_PROF_BUF_SIZE);
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
-    for (i = 0; i < MAX_VBUF_SIZE; i+=PAGE_SIZE) {
-        SetPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + i)));
+    for (i = 0; i < MAX_PROF_BUF_SIZE; i+=PAGE_SIZE) {
+        SetPageReserved(vmalloc_to_page((void *)(((unsigned long)prof_buf) + i)));
     }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
@@ -281,11 +281,11 @@ void __exit mp3_exit(void) {
     cdev_del(&cdev);
     unregister_chrdev_region(dev, 1);
 
-    if (delayed_work_pending(&profiler_work))
+    if (delayed_work_pending(&prof_work))
         // Reference: https://linuxtv.org/downloads/v4l-dvb-internals/device-drivers/API-cancel-delayed-work-sync.html
         // Reference: https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
         // Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/workqueue_8c.html
-        cancel_delayed_work_sync(&profiler_work);
+        cancel_delayed_work_sync(&prof_work);
     destroy_workqueue(wq);
 
     spin_lock_irqsave(&lock, flag);
@@ -296,8 +296,8 @@ void __exit mp3_exit(void) {
     spin_unlock_irqrestore(&lock, flag);
 
     // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
-    for (i = 0; i < MAX_VBUF_SIZE; i+=PAGE_SIZE) {
-        ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)vbuf) + i)));
+    for (i = 0; i < MAX_PROF_BUF_SIZE; i+=PAGE_SIZE) {
+        ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)prof_buf) + i)));
     }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADED\n");

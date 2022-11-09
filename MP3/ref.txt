@@ -1,0 +1,38 @@
+list_empty
+1. https://man7.org/linux/man-pages/man3/list.3.html
+2. https://www.kernel.org/doc/htmldocs/kernel-api/API-list-empty.html
+
+list_add_tail
+1. https://www.kernel.org/doc/htmldocs/kernel-api/API-list-add-tail.html
+2. https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch10s05.html
+
+register_chrdev_region
+1. https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L236
+
+cdev_init
+1. https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L651
+
+cdev_add
+1. https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L479
+
+msecs_to_jiffies
+1. https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/jiffies.h#L363
+
+vmalloc
+1. https://elixir.bootlin.com/linux/v5.15.63/source/mm/vmalloc.c#L3104
+
+SetPageReserved
+1. https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
+
+cdev_del
+1. https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L594
+
+unregister_chrdev_region
+1. https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L311
+
+cancel_delayed_work_sync
+1. https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
+2. https://elixir.bootlin.com/linux/v5.15.63/source/kernel/workqueue.c#L3309
+
+ClearPageReserved
+1. https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html

@@ -209,7 +209,12 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
    return size;
 }
 
-// mp1_init - Called when module is loaded
+/**
+ * called when mp1 module is loaded
+ *
+ * @param void
+ * @return void
+ */
 int __init mp3_init(void) {
     int ret = 0;
     int i;
@@ -217,38 +222,43 @@ int __init mp3_init(void) {
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADING\n");
     #endif
 
+    /* create /proc/mp3 */
     if ((proc_dir = proc_mkdir(DIRECTORY, NULL)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "\n");
         return -ENOMEM;
     }
 
+    /* create /proc/mp3/status */
     if ((proc_entry = proc_create(FILENAME, 0666, proc_dir, &proc_fops)) == NULL) {
         remove_proc_entry(DIRECTORY, NULL);
         printk(KERN_ALERT "[KERN_ALERT]: Fail to create /proc/" DIRECTORY "/" FILENAME "\n");
         return -ENOMEM;
     }
 
-    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L236
+    /* register character device */
     if ((ret = register_chrdev_region(dev, 1, DEVICE_NAME)) < 0) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to register character device\n");
         goto rm_proc_entry;
     }
-    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L651
+
+    /* init character device */
     cdev_init(&cdev, &cdev_fops);
-    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L479
+
+    /* add character device */
     if ((ret = cdev_add(&cdev, dev, 1)) < 0) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to add character device\n");
         goto unreg_cdev;
     }
 
+    /* create workqueue */
     if ((wq = create_workqueue("work_queue")) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to create workqueue\n");
         ret = -ENOMEM;
         goto rm_cdev;
     }
-    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/jiffies.h#L363
     delay_jiffies = msecs_to_jiffies(DELAY_MS);
 
+    /* allocate virtually contiguous memory */
     if ((prof_buf = vmalloc(MAX_PROF_BUF_SIZE)) == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate virtually contiguous memory\n");
         ret = -ENOMEM;
@@ -256,7 +266,6 @@ int __init mp3_init(void) {
     }
     memset(prof_buf, -1, MAX_PROF_BUF_SIZE);
 
-    // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
     for (i = 0; i < MAX_PROF_BUF_SIZE; i+=PAGE_SIZE) {
         SetPageReserved(vmalloc_to_page((void *)(((unsigned long)prof_buf) + i)));
     }
@@ -264,19 +273,24 @@ int __init mp3_init(void) {
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
     return 0;
 
-rm_wq:
+rm_wq:                                      /* if vmalloc failed                */
     destroy_workqueue(wq);
-rm_cdev:
+rm_cdev:                                    /* if create_workqueue failed       */
     cdev_del(&cdev);
-unreg_cdev:
+unreg_cdev:                                 /* if cdev_add failed               */
     unregister_chrdev_region(dev, 1);
-rm_proc_entry:
+rm_proc_entry:                              /* if register_chrdev_region failed */
     remove_proc_entry(FILENAME, proc_dir);
     remove_proc_entry(DIRECTORY, NULL);
     return ret;
 }
 
-// mp3_exit - Called when module is unloaded
+/**
+ * called when mp3 module is unloaded
+ *
+ * @param void
+ * @return void
+ */
 void __exit mp3_exit(void) {
     unsigned long flag;
     work_proc_struct_t *pos, *n;
@@ -285,28 +299,23 @@ void __exit mp3_exit(void) {
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADING\n");
     #endif
 
-    remove_proc_entry(FILENAME, proc_dir);
-    remove_proc_entry(DIRECTORY, NULL);
+    remove_proc_entry(FILENAME, proc_dir);      /* remove /proc/mp3/status  */
+    remove_proc_entry(DIRECTORY, NULL);         /* remove /proc/mp3         */
 
-    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L594
     cdev_del(&cdev);
-    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L311
     unregister_chrdev_region(dev, 1);
 
-    if (delayed_work_pending(&prof_work))
-        // Reference: https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
-        // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/kernel/workqueue.c#L3309
-        cancel_delayed_work_sync(&prof_work);
-    destroy_workqueue(wq);
+    if (delayed_work_pending(&prof_work))       /* check pending delayed work   */
+        cancel_delayed_work_sync(&prof_work);   /* wait & cancel delayed work   */
+    destroy_workqueue(wq);                      /* safely destroy workqueue     */
 
     spin_lock_irqsave(&lock, flag);
     list_for_each_entry_safe(pos, n, &work_proc_struct_list, list) {
-        list_del(&pos->list);
-        kfree(pos);
+        list_del(&pos->list);                   /* delete each element in list  */
+        kfree(pos);                             /* free work_proc_struct        */
     }
     spin_unlock_irqrestore(&lock, flag);
 
-    // Reference: https://linux-kernel-labs.github.io/refs/heads/master/labs/memory_mapping.html
     for (i = 0; i < MAX_PROF_BUF_SIZE; i+=PAGE_SIZE) {
         ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)prof_buf) + i)));
     }

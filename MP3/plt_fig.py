@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 CASE_STUDY_ANALYSIS_DIR='Case_Study_Analysis/'
 CASE_STUDY_1_WORK12='case_study_1_work_1&2.png'
 CASE_STUDY_1_WORK34='case_study_1_work_3&4.png'
+CASE_STUDY_2_FILE_NUM=35
+PROFILE_DATA_FILE_PREFIX='profile_'
+PROFILE_DATA_FILE_SUFFIX='.data'
 DEBUG=0
 
 def plt_figure(case, pro_data):
@@ -62,13 +65,44 @@ def plt_figure(case, pro_data):
             print('[INFO]: Graph saved to %s'%(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK34))
         print('[INFO]: Finish plotting graph')
 
+def plt_thrashing(case_study_2_folder):
+    ttl_util = []
+    for i in range(1,CASE_STUDY_2_FILE_NUM,1):
+        time, min_flt, maj_flt, util = [], [], [], []
+        print('[INFO]: Reading from file %s...'%(case_study_2_folder+'/'+PROFILE_DATA_FILE_PREFIX+str(i)+PROFILE_DATA_FILE_SUFFIX))
+        with open(case_study_2_folder+'/'+PROFILE_DATA_FILE_PREFIX+str(i)+PROFILE_DATA_FILE_SUFFIX, 'r') as pro_data_file:
+            lines = [line.strip() for line in pro_data_file]
+        for line in lines:
+            try:
+                line = line.split(sep=' ', maxsplit=-1)
+                util.append(int(line[3]))
+            except:
+                file_len = int(line[1])
+        if DEBUG:
+            print('[UTIL]:   ',util)
+            print('[LEN]:     TIME_LEN %d, MIN_FLT_LEN %d, MAJ_FLT_LEN %d, UTIL_LEN: %d'%(len(time),len(min_flt),len(maj_flt),len(util)))
+        assert file_len == len(util)
+        ttl_util.append(sum(util))
+        print('[INFO]: Finish reading file %s'%(case_study_2_folder+'/'+PROFILE_DATA_FILE_PREFIX+str(i)+PROFILE_DATA_FILE_SUFFIX))
+
+    if DEBUG:
+        print('[TTL_UTIL]:   ',ttl_util)
+        print('[TTL_UTIL_LEN]',len(ttl_util))
+    print('[INFO]: Finish reading from %s directory'%case_study_2_folder)
+
+    idx = list(range(1, len(ttl_util)+1))
+    plt.plot(idx, ttl_util)
+    plt.show()
+    return
+
 def main():
-    if len(sys.argv) != 3:
-        print('[USAGE]: ./thrashing_locality.py <profile1.data_file> <profile2.data_file>')
+    if len(sys.argv) != 4:
+        print('[USAGE]: ./thrashing_locality.py <profile1.data_file> <profile2.data_file> <case_study_2_folder>')
         exit(1)
-    plt_figure(case=0, pro_data=sys.argv[1])
-    print('-'*35)
-    plt_figure(case=1, pro_data=sys.argv[2])
+    #plt_figure(case=0, pro_data=sys.argv[1])
+    #print('-'*35)
+    #plt_figure(case=1, pro_data=sys.argv[2])
+    plt_thrashing(sys.argv[3])
 
 if __name__ == '__main__':
     main()

@@ -45,7 +45,7 @@ Run the following command
 * create `/proc/mp2` directory
 * create `/proc/mp2/status` file
 
-##### 3. Initialize `spin_lock` & `mutex`
+##### 3. Initialize `spinlock` & `mutex`
 * `spinlock` write `task->state` protection from in function `timer_callback`
 * 2 `mutex` write protection
   * 1 mutex to protect write to `rms_task_struct_list`

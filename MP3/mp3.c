@@ -1,3 +1,14 @@
+/**
+ * FILENAME: mp3.c
+ *
+ * DESCRIPTION: mp3 kernel module file
+ *              Virtual Memory Page Fault Profiler
+ *
+ * AUTHOR: Hongbo Zheng
+ *
+ * DATE: Saturday Nov 5th, 2022
+ */
+
 #define LINUX
 
 #include "mp3.h"
@@ -32,13 +43,13 @@ void update_data(struct work_struct *work) {
     ttl_min_flt = ttl_maj_flt = ttl_util = 0;
 
     spin_lock_irqsave(&lock, flag);
-    list_for_each_entry(work_proc, &work_proc_struct_list, list_node){
-        if (get_cpu_use(work_proc->pid, &work_proc->minor_page_fault, &work_proc->major_page_fault,
+    list_for_each_entry(work_proc, &work_proc_struct_list, list){
+        if (get_cpu_use(work_proc->pid, &work_proc->min_page_flt, &work_proc->maj_page_flt,
                         &utime, &stime) == 0) {
             work_proc->utilization = utime + stime;
             ttl_util += work_proc->utilization;
-            ttl_maj_flt += work_proc->major_page_fault;
-            ttl_min_flt += work_proc->minor_page_fault;
+            ttl_maj_flt += work_proc->maj_page_flt;
+            ttl_min_flt += work_proc->min_page_flt;
         }
     }
     spin_unlock_irqrestore(&lock, flag);
@@ -76,7 +87,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     }
 
     spin_lock_irqsave(&lock, flag);
-    list_for_each_entry(work_proc, &work_proc_struct_list, list_node){
+    list_for_each_entry(work_proc, &work_proc_struct_list, list){
         byte_read += sprintf(kbuf+byte_read, "PID: %d\n", work_proc->pid);
     }
     spin_unlock_irqrestore(&lock, flag);
@@ -96,7 +107,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 
 work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
     work_proc_struct_t *work_proc = NULL;
-    list_for_each_entry(work_proc, &work_proc_struct_list, list_node) {
+    list_for_each_entry(work_proc, &work_proc_struct_list, list) {
         if (work_proc->pid == pid) return work_proc;
     }
     return work_proc;
@@ -121,8 +132,8 @@ int reg_proc(char *buf) {
     work_proc->pid = pid;
     work_proc->linux_task = linux_task;
     work_proc->utilization = 0;
-    work_proc->major_page_fault = 0;
-    work_proc->minor_page_fault = 0;
+    work_proc->maj_page_flt = 0;
+    work_proc->min_page_flt = 0;
 
     // Reference: https://man7.org/linux/man-pages/man3/list.3.html
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-empty.html
@@ -132,7 +143,7 @@ int reg_proc(char *buf) {
     spin_lock_irqsave(&lock, flag);
     // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-add-tail.html
     // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch10s05.html
-    list_add_tail(&work_proc->list_node, &work_proc_struct_list);
+    list_add_tail(&work_proc->list, &work_proc_struct_list);
     spin_unlock_irqrestore(&lock, flag);
 
     return 1;
@@ -151,7 +162,7 @@ int dereg_proc(char *buf) {
         printk(KERN_ALERT "[KERN_ALERT]: Cannot find work_proc_struct in list\n");
         return 0;
     }
-    list_del(&work_proc->list_node);
+    list_del(&work_proc->list);
     spin_unlock_irqrestore(&lock, flag);
 
     if (list_empty(&work_proc_struct_list))
@@ -289,8 +300,8 @@ void __exit mp3_exit(void) {
     destroy_workqueue(wq);
 
     spin_lock_irqsave(&lock, flag);
-    list_for_each_entry_safe(pos, n, &work_proc_struct_list, list_node) {
-        list_del(&pos->list_node);
+    list_for_each_entry_safe(pos, n, &work_proc_struct_list, list) {
+        list_del(&pos->list);
         kfree(pos);
     }
     spin_unlock_irqrestore(&lock, flag);

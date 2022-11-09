@@ -11,56 +11,46 @@
 #ifndef __MP3_H__
 #define __MP3_H__
 
-#include <linux/module.h>
+#include <linux/module.h>   /* module_init & module_exit                            */
 #include <linux/kernel.h>
-#include <linux/list.h>
-#include <linux/proc_fs.h>
-#include <linux/uaccess.h>
-#include <linux/slab.h>
-#include <linux/timer.h>
-#include <linux/jiffies.h>
-#include <linux/workqueue.h>
-#include <linux/init.h>
-#include <linux/kthread.h>
-#include <linux/sched.h>
-//#include <asm-generic/atomic-long.h>
-#include <linux/page-flags.h>
-#include <linux/vmalloc.h>
-#include <linux/mm.h>
-#include <linux/cdev.h>
-#include <linux/device.h>
-#include "mp3_given.h"
+#include <linux/proc_fs.h>  /* proc_ops & proc_mkdir & proc_create & rm_proc_entry  */
+#include <linux/slab.h>     /* kmalloc & kfree                                      */
+#include <linux/vmalloc.h>  /* vmalloc                                              */
+#include <linux/mm.h>       /* vmalloc_to_pfn & remap_pfn_range                     */
+#include <linux/cdev.h>     /* struct cdev & cdev_init & cdev_add & cdev_del        */
+#include "mp3_given.h"      /* mp3_given header file                                */
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Group_ID");
 MODULE_DESCRIPTION("CS-423 MP3");
 
 #define DEBUG
-#define FILENAME "status"
-#define DIRECTORY "mp3"
-#define MAJOR_NUM 423
-#define MINOR_NUM 0
-#define DEVICE_NAME "cdev"
-#define SAMPLE 20
-#define DELAY_MS 1000/SAMPLE
-#define NUM_PAGE 128
-#define MAX_PROF_BUF_SIZE NUM_PAGE*4*1024
-#define REGISTRATION 'R'
-#define DE_REGISTRATION 'U'
-#define PID_OFFSET 2
+#define FILENAME            "status"            /* proc filename            */
+#define DIRECTORY           "mp3"               /* proc dir name            */
+#define DEV_MAJOR_NUM       423                 /* character device major # */
+#define DEV_MINOR_NUM       0                   /* character device minor # */
+#define DEVICE_NAME         "cdev"              /* character device name    */
+#define SAMPLE_FREQ         20                  /* sample frequency         */
+#define DELAY_MS            1000/SAMPLE_FREQ    /* work delay in ms         */
+#define NUM_PAGE            128                 /* # of page                */
+#define MAX_PROF_BUF_SIZE   NUM_PAGE*4*1024     /* max profiler buf size    */
+#define REGISTRATION        'R'                 /* registration             */
+#define DE_REGISTRATION     'U'                 /* de-registration          */
+#define PID_OFFSET          2                   /* buf offset for PID       */
 
-static LIST_HEAD(work_proc_struct_list);
-static DEFINE_SPINLOCK(lock);
-static void update_data(struct work_struct *work);
-static DECLARE_DELAYED_WORK(prof_work, &update_data);
+static LIST_HEAD(work_proc_struct_list);                /* define work process struct list head         */
+static DEFINE_SPINLOCK(lock);                           /* define spinlock for work process struct list */
+static void update_data(struct work_struct *work);      /* define work function                         */
+static DECLARE_DELAYED_WORK(prof_work, &update_data);   /* define delayed work                          */
 
+/* define work process struct */
 typedef struct work_proc_struct {
-    struct task_struct *linux_task;
-    struct list_head list_node;
-    pid_t pid;
-    unsigned long utilization;
-    unsigned long major_page_fault;
-    unsigned long minor_page_fault;
+    pid_t pid;                          /* process ID       */
+    struct task_struct *linux_task;     /* linux task       */
+    struct list_head list;              /* list head        */
+    unsigned long utilization;          /* utilization      */
+    unsigned long maj_page_flt;         /* major page fault */
+    unsigned long min_page_flt;         /* minor page fault */
 } work_proc_struct_t;
 
 static struct proc_dir_entry *proc_dir, *proc_entry;
@@ -71,7 +61,9 @@ static const struct proc_ops proc_fops = {
         .proc_write = proc_write,
 };
 
-static dev_t dev = MKDEV(MAJOR_NUM, MINOR_NUM);
+// Reference: https://man7.org/linux/man-pages/man3/makedev.3.html
+// Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596005903/ch03.html
+static dev_t dev = MKDEV(DEV_MAJOR_NUM, DEV_MINOR_NUM);
 // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/cdev.h#L14
 static struct cdev cdev;
 // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch13s02.html
@@ -87,9 +79,9 @@ static const struct file_operations cdev_fops = {
         .release = NULL,
 };
 
-struct workqueue_struct *wq;
-static unsigned long delay_jiffies;
-static unsigned long *prof_buf;
-static unsigned prof_buf_ptr = 0;
+struct workqueue_struct *wq;            /* workqueue struct     */
+static unsigned long delay_jiffies;     /* delay in jiffies     */
+static unsigned long *prof_buf;         /* profiler buffer      */
+static unsigned prof_buf_ptr = 0;       /* profiler buffer ptr  */
 
 #endif

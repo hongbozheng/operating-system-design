@@ -217,14 +217,14 @@ int __init mp3_init(void) {
         return -ENOMEM;
     }
 
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-alloc-chrdev-region.html
-    if ((ret = alloc_chrdev_region(&dev, 0, 1, DEVICE_NAME)) < 0) {
-        printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate character device\n");
+    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L236
+    if ((ret = register_chrdev_region(dev, 1, DEVICE_NAME)) < 0) {
+        printk(KERN_ALERT "[KERN_ALERT]: Fail to register character device\n");
         goto rm_proc_entry;
     }
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-init.html
+    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L651
     cdev_init(&cdev, &cdev_fops);
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-add.html
+    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L479
     if ((ret = cdev_add(&cdev, dev, 1)) < 0) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to add character device\n");
         goto unreg_cdev;
@@ -261,7 +261,7 @@ unreg_cdev:
     unregister_chrdev_region(dev, 1);
 rm_proc_entry:
     remove_proc_entry(FILENAME, proc_dir);
-    remove_proc_entry(FILENAME, NULL);
+    remove_proc_entry(DIRECTORY, NULL);
     return ret;
 }
 
@@ -277,14 +277,14 @@ void __exit mp3_exit(void) {
     remove_proc_entry(FILENAME, proc_dir);
     remove_proc_entry(DIRECTORY, NULL);
 
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-cdev-del.html
+    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L594
     cdev_del(&cdev);
+    // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/fs/char_dev.c#L311
     unregister_chrdev_region(dev, 1);
 
     if (delayed_work_pending(&prof_work))
-        // Reference: https://linuxtv.org/downloads/v4l-dvb-internals/device-drivers/API-cancel-delayed-work-sync.html
         // Reference: https://manpages.debian.org/testing/linux-manual-4.8/cancel_delayed_work.9
-        // Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/workqueue_8c.html
+        // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/kernel/workqueue.c#L3309
         cancel_delayed_work_sync(&prof_work);
     destroy_workqueue(wq);
 

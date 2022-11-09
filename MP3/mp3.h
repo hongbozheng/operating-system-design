@@ -39,6 +39,7 @@ MODULE_DESCRIPTION("CS-423 MP3");
 #define FILENAME "status"
 #define DIRECTORY "mp3"
 #define MAJOR_NUM 423
+#define MINOR_NUM 0
 #define DEVICE_NAME "cdev"
 #define SAMPLE 20
 #define DELAY_MS 1000/SAMPLE
@@ -70,8 +71,9 @@ static const struct proc_ops proc_fops = {
         .proc_write = proc_write,
 };
 
-static dev_t dev;
-struct cdev cdev;
+static dev_t dev = MKDEV(MAJOR_NUM, MINOR_NUM);
+// Reference: https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/cdev.h#L14
+static struct cdev cdev;
 // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch13s02.html
 static int cdev_mmap(struct file *file, struct vm_area_struct *vma);
 // Reference: https://elixir.bootlin.com/linux/latest/source/include/linux/fs.h#L2093

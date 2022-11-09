@@ -105,6 +105,15 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     return byte_read;
 }
 
+/**
+ * function that get the work_proc_struct_t *ptr
+ * using the given pid
+ *
+ * @param pid process id
+ * @return rms_task_struct_t *ptr
+ *          if rms_task_struct found, return rms_task_struct_t *ptr
+ *          if not found, return NULL
+ */
 work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
     work_proc_struct_t *work_proc = NULL;
     list_for_each_entry(work_proc, &work_proc_struct_list, list) {

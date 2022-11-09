@@ -61,17 +61,9 @@ static const struct proc_ops proc_fops = {
         .proc_write = proc_write,
 };
 
-// Reference: https://man7.org/linux/man-pages/man3/makedev.3.html
-// Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596005903/ch03.html
 static dev_t dev = MKDEV(DEV_MAJOR_NUM, DEV_MINOR_NUM);
-// Reference: https://elixir.bootlin.com/linux/v5.15.63/source/include/linux/cdev.h#L14
 static struct cdev cdev;
-// Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch13s02.html
 static int cdev_mmap(struct file *file, struct vm_area_struct *vma);
-// Reference: https://elixir.bootlin.com/linux/latest/source/include/linux/fs.h#L2093
-// Reference: https://tldp.org/LDP/lkmpg/2.4/html/c577.htm
-// Reference: https://docs.huihoo.com/doxygen/linux/kernel/3.7/structfile__operations.html
-// Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch03s03.html
 static const struct file_operations cdev_fops = {
         .owner = THIS_MODULE,
         .mmap = cdev_mmap,

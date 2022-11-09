@@ -113,6 +113,12 @@ work_proc_struct_t *__get_work_proc_by_pid(pid_t pid) {
     return work_proc;
 }
 
+/**
+ * function that register process
+ *
+ * @param   buf buf contains process info
+ * @return  int 1-success; 0 or negative error code - failed
+ */
 int reg_proc(char *buf) {
     pid_t pid;
     unsigned long flag;
@@ -135,20 +141,22 @@ int reg_proc(char *buf) {
     work_proc->maj_page_flt = 0;
     work_proc->min_page_flt = 0;
 
-    // Reference: https://man7.org/linux/man-pages/man3/list.3.html
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-empty.html
     if (list_empty(&work_proc_struct_list))
         queue_delayed_work(wq, &prof_work, delay_jiffies);
 
     spin_lock_irqsave(&lock, flag);
-    // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-list-add-tail.html
-    // Reference: https://www.oreilly.com/library/view/linux-device-drivers/0596000081/ch10s05.html
     list_add_tail(&work_proc->list, &work_proc_struct_list);
     spin_unlock_irqrestore(&lock, flag);
 
     return 1;
 }
 
+/**
+ * function that de-register process
+ *
+ * @param *buf  buf contains process info
+ * @return int  1-success; 0-failed
+ */
 int dereg_proc(char *buf) {
     pid_t pid;
     unsigned long flag;
@@ -171,6 +179,15 @@ int dereg_proc(char *buf) {
     return 1;
 }
 
+/**
+ * function to write /proc/mp3/status file
+ *
+ * @param *file     file to write
+ * @param *buffer   user buffer
+ * @param size      size of user buffer
+ * @param *offset   offset in the file
+ * @return ssize_t  number of byte written
+ */
 static ssize_t proc_write(struct file *file, const char __user *buffer, size_t size, loff_t *offset) {
     unsigned long cpy_usr_byte;
     char *kbuf;

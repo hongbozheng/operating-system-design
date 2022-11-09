@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# CMD: ./thrashing_locality.py profile1.data profile2.data
+# CMD: ./plt_fig.py profile1.data profile2.data Case_study_2_Profile_Data
 
 import sys
 import matplotlib.pyplot as plt
@@ -97,12 +97,12 @@ def plt_thrashing(case_study_2_folder):
 
 def main():
     if len(sys.argv) != 4:
-        print('[USAGE]: ./thrashing_locality.py <profile1.data_file> <profile2.data_file> <case_study_2_folder>')
+        print('[USAGE]: ./plt_fig.py <profile1.data_file> <profile2.data_file> <case_study_2_folder>')
         exit(1)
-    #plt_figure(case=0, pro_data=sys.argv[1])
-    #print('-'*35)
-    #plt_figure(case=1, pro_data=sys.argv[2])
-    plt_thrashing(sys.argv[3])
+    plt_figure(case=0, pro_data=sys.argv[1])
+    print('-'*35)
+    plt_figure(case=1, pro_data=sys.argv[2])
+    # plt_thrashing(sys.argv[3])
 
 if __name__ == '__main__':
     main()

@@ -13,6 +13,15 @@
 
 #include "mp3.h"
 
+/**
+ * mmap callback
+ * mapping the physical pages of the buffer to
+ * the virtual address space of a requested user process
+ *
+ * @param file  struct file ptr
+ * @param vma   struct vm_area_struct
+ * @return int  0-success; negative error code - failed
+ */
 static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
     unsigned long i, pfn;
     unsigned long size = vma->vm_end - vma->vm_start;
@@ -25,8 +34,6 @@ static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
    
     for (i = 0; i < size; i+=PAGE_SIZE) {
         pfn = vmalloc_to_pfn((void *)(((unsigned long)prof_buf) + i));
-        // Reference: https://elixir.bootlin.com/linux/v5.15.63/source/mm/memory.c#L2452
-        // Reference: https://www.kernel.org/doc/htmldocs/kernel-api/API-remap-pfn-range.html
         if ((ret = remap_pfn_range(vma, vma->vm_start+i, pfn, PAGE_SIZE, vma->vm_page_prot)) < 0) {
             printk(KERN_ALERT "[KERN_ALERT]: Fail to remap kernel memory to userspace\n");
             return ret;
@@ -36,6 +43,15 @@ static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
     return 0;
 }
 
+/**
+ * work function to update data
+ * work_proc->utilization
+ * work_proc->maj_page_flt
+ * work_proc->min_page_flt
+ *
+ * @param work
+ * @return void
+ */
 void update_data(struct work_struct *work) {
     unsigned long flag;
     work_proc_struct_t *work_proc;
@@ -47,24 +63,24 @@ void update_data(struct work_struct *work) {
         if (get_cpu_use(work_proc->pid, &work_proc->min_page_flt, &work_proc->maj_page_flt,
                         &utime, &stime) == 0) {
             work_proc->utilization = utime + stime;
-            ttl_util += work_proc->utilization;
-            ttl_maj_flt += work_proc->maj_page_flt;
-            ttl_min_flt += work_proc->min_page_flt;
+            ttl_util += work_proc->utilization;         /* sum up utilization       */
+            ttl_maj_flt += work_proc->maj_page_flt;     /* sum up major page fault  */
+            ttl_min_flt += work_proc->min_page_flt;     /* sum up minor page fault  */
         }
     }
     spin_unlock_irqrestore(&lock, flag);
 
-    prof_buf[prof_buf_ptr++] = jiffies;
-    prof_buf[prof_buf_ptr++] = ttl_min_flt;
-    prof_buf[prof_buf_ptr++] = ttl_maj_flt;
-    prof_buf[prof_buf_ptr++] = ttl_util;
+    prof_buf[prof_buf_ptr++] = jiffies;                 /* write cur time in jiffies to profiler buf    */
+    prof_buf[prof_buf_ptr++] = ttl_min_flt;             /* write total minor page fault to profiler buf */
+    prof_buf[prof_buf_ptr++] = ttl_maj_flt;             /* write total major page fault to profiler buf */
+    prof_buf[prof_buf_ptr++] = ttl_util;                /* write total utilization to profiler buf      */
 
     if (prof_buf_ptr >= MAX_PROF_BUF_SIZE) {
         printk(KERN_ALERT "[KERN_ALERT]: PROFILE BUFFER FULL, RESET PROFILE BUFFER PTR\n");
         prof_buf_ptr = 0;
     }
 
-    queue_delayed_work(wq, &prof_work, delay_jiffies);
+    queue_delayed_work(wq, &prof_work, delay_jiffies);  /* enqueue delayed work with delay in jiffies   */
 }
 
 static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, loff_t *offset) {
@@ -73,7 +89,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
     ssize_t byte_read;
     work_proc_struct_t* work_proc;
 
-   if(*offset > 0) return 0;
+   if(*offset > 0) return 0;        /* if file already read, return 0 */
 
    if (!access_ok(buffer, size)) {
        printk(KERN_ALERT "[KERN_ALERT]: User Buffer is NOT WRITABLE\n");
@@ -135,6 +151,7 @@ int reg_proc(char *buf) {
     sscanf(buf, "%d", &pid);
     printk(KERN_ALERT "[KERN_ALERT]: REGISTER PROCESS WITH PID %d\n", pid);
 
+    /* check if the linux task with pid exists */
     struct task_struct *linux_task = find_task_by_pid(pid);
     if (linux_task == NULL) return 0;
 
@@ -144,15 +161,18 @@ int reg_proc(char *buf) {
         return -ENOMEM;
     }
 
+    /* init strcut work_proc */
     work_proc->pid = pid;
     work_proc->linux_task = linux_task;
     work_proc->utilization = 0;
     work_proc->maj_page_flt = 0;
     work_proc->min_page_flt = 0;
 
+    /* if it's the first work process, enqueue delayed work */
     if (list_empty(&work_proc_struct_list))
         queue_delayed_work(wq, &prof_work, delay_jiffies);
 
+    /* add new struct work_proc to list */
     spin_lock_irqsave(&lock, flag);
     list_add_tail(&work_proc->list, &work_proc_struct_list);
     spin_unlock_irqrestore(&lock, flag);
@@ -182,6 +202,7 @@ int dereg_proc(char *buf) {
     list_del(&work_proc->list);
     spin_unlock_irqrestore(&lock, flag);
 
+    /* if it's the last struct work_proc, wait and cancel delayed work */
     if (list_empty(&work_proc_struct_list))
         cancel_delayed_work_sync(&prof_work);
 
@@ -217,7 +238,7 @@ static ssize_t proc_write(struct file *file, const char __user *buffer, size_t s
         printk(KERN_ALERT "[KERN_ALERT]: copy_from_user fail\n");
     }
 
-    kbuf[size] = '\0';
+    kbuf[size] = '\0';  /* terminate kbuf */
 
     switch (kbuf[0]) {
         case REGISTRATION:

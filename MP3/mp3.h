@@ -61,9 +61,9 @@ static const struct proc_ops proc_fops = {
         .proc_write = proc_write,
 };
 
-static dev_t dev = MKDEV(DEV_MAJOR_NUM, DEV_MINOR_NUM);
-static struct cdev cdev;
-static int cdev_mmap(struct file *file, struct vm_area_struct *vma);
+static dev_t dev = MKDEV(DEV_MAJOR_NUM, DEV_MINOR_NUM);                 /* chrdev major & minor #   */
+static struct cdev cdev;                                                /* character device struct  */
+static int cdev_mmap(struct file *file, struct vm_area_struct *vma);    /* mmap callback function   */
 static const struct file_operations cdev_fops = {
         .owner = THIS_MODULE,
         .mmap = cdev_mmap,

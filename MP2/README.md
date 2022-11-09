@@ -42,8 +42,8 @@ Run the following command
 * `proc_entry` for status file
 
 ##### 2. Create process directory and file
-* create `/proc/mp1` directory
-* create `/proc/mp1/status` file
+* create `/proc/mp2` directory
+* create `/proc/mp2/status` file
 
 ##### 3. Initialize `spin_lock` & `mutex`
 * `spinlock` write `task->state` protection from in function `timer_callback`

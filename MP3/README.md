@@ -1,4 +1,4 @@
-# MP2 - Virtual Memory Page Fault Profiler
+# MP3 - Virtual Memory Page Fault Profiler
 ##### Instructor: Tianyin Xu
 Deadline --- Friday, November, 11th, 11:59PM
 
@@ -65,7 +65,6 @@ Run the following command
 * `proc_write`  process write to file
 
 ##### 7. `proc_read` function
-* $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
 * `if loff_t *offset > 0` the user already read the file, `return 0`
 * else, start reading from `/proc/mp2/status` file, and modify the `loff_t *offset = byte_read`
 * use `sprintf` to read task pid and store it in `work_proc_struct` in the task struct list

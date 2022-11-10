@@ -33,7 +33,7 @@ static int cdev_mmap(struct file *file, struct vm_area_struct *vma) {
 	}
    
     for (i = 0; i < size; i+=PAGE_SIZE) {
-        pfn = vmalloc_to_pfn((void *)(((unsigned long)prof_buf) + i));
+        pfn = vmalloc_to_pfn((char *)prof_buf + i);
         if ((ret = remap_pfn_range(vma, vma->vm_start+i, pfn, PAGE_SIZE, vma->vm_page_prot)) < 0) {
             printk(KERN_ALERT "[KERN_ALERT]: Fail to remap kernel memory to userspace\n");
             return ret;
@@ -312,7 +312,7 @@ int __init mp3_init(void) {
     memset(prof_buf, -1, MAX_PROF_BUF_SIZE);
 
     for (i = 0; i < MAX_PROF_BUF_SIZE; i+=PAGE_SIZE) {
-        SetPageReserved(vmalloc_to_page((void *)(((unsigned long)prof_buf) + i)));
+        SetPageReserved(vmalloc_to_page((char *)prof_buf + i));
     }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE LOADED\n");
@@ -339,7 +339,7 @@ rm_proc_entry:                              /* if register_chrdev_region failed 
 void __exit mp3_exit(void) {
     unsigned long flag;
     work_proc_struct_t *pos, *n;
-    int i;
+    unsigned long i;
     #ifdef DEBUG
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADING\n");
     #endif
@@ -362,7 +362,7 @@ void __exit mp3_exit(void) {
     spin_unlock_irqrestore(&lock, flag);
 
     for (i = 0; i < MAX_PROF_BUF_SIZE; i+=PAGE_SIZE) {
-        ClearPageReserved(vmalloc_to_page((void *)(((unsigned long)prof_buf) + i)));
+        ClearPageReserved(vmalloc_to_page((char *)prof_buf + i));
     }
 
     printk(KERN_ALERT "[KERN_ALERT]: MP3 MODULE UNLOADED\n");

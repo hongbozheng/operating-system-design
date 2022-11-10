@@ -104,7 +104,7 @@ static ssize_t proc_read(struct file *file, char __user *buffer, size_t size, lo
 
     spin_lock_irqsave(&lock, flag);
     list_for_each_entry(work_proc, &work_proc_struct_list, list){
-        byte_read += sprintf(kbuf+byte_read, "PID: %d\n", work_proc->pid);
+        byte_read += sprintf(kbuf+byte_read, "%d\n", work_proc->pid);
     }
     spin_unlock_irqrestore(&lock, flag);
 
@@ -156,7 +156,7 @@ int reg_proc(char *buf) {
     if (linux_task == NULL) return 0;
 
     work_proc_struct_t* work_proc = (work_proc_struct_t *)kmalloc(sizeof(work_proc_struct_t), GFP_KERNEL);
-    if(work_proc == NULL) {
+    if (work_proc == NULL) {
         printk(KERN_ALERT "[KERN_ALERT]: Fail to allocate kernel memory\n");
         return -ENOMEM;
     }
@@ -169,8 +169,7 @@ int reg_proc(char *buf) {
     work_proc->min_page_flt = 0;
 
     /* if it's the first work process, enqueue delayed work */
-    if (list_empty(&work_proc_struct_list))
-        queue_delayed_work(wq, &prof_work, delay_jiffies);
+    if (list_empty(&work_proc_struct_list)) queue_delayed_work(wq, &prof_work, delay_jiffies);
 
     /* add new struct work_proc to list */
     spin_lock_irqsave(&lock, flag);
@@ -203,8 +202,7 @@ int dereg_proc(char *buf) {
     spin_unlock_irqrestore(&lock, flag);
 
     /* if it's the last struct work_proc, wait and cancel delayed work */
-    if (list_empty(&work_proc_struct_list))
-        cancel_delayed_work_sync(&prof_work);
+    if (list_empty(&work_proc_struct_list)) cancel_delayed_work_sync(&prof_work);
 
     return 1;
 }

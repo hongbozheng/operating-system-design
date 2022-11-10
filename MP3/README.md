@@ -58,88 +58,62 @@ Run the following command
 * `unsigned long delay_jiffies` delay for delayed_work in jiffies
 * `unsigned long *prof_buf` profiler buffer
 * `unsigned long prof_buf_ptr` profiler buffer ptr
+* SetPageReserved
 
 ##### 6. Create `struct proc_ops`
 * `proc_read` process read from file
 * `proc_write`  process write to file
 
 ##### 7. `proc_read` function
-* check if the user already read all the file
-* if not, start reading from `/proc/mp2/status` file, and modify the `loff_t *loff`
-* else return `0` for read 0 byte
-* use `sprintf` to read task information and store them in `rms_task_struct` in the task struct list
-    * `<pid>: <task_period>, <computation_time>`
+* $$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+* `if loff_t *offset > 0` the user already read the file, `return 0`
+* else, start reading from `/proc/mp2/status` file, and modify the `loff_t *offset = byte_read`
+* use `sprintf` to read task pid and store it in `work_proc_struct` in the task struct list
+    * `<pid>`
 
-##### 8. `proc_write` function
+##### 8. `__get_work_proc_by_pid` function
+* find the task in the `work_proc_struct_list` with given `pid_t pid`
+  * if task exists, return `proc_work_struct`
+  * else return `NULL`
+
+##### 9. `register_process` function
+* use `sscanf` to get the `work_proc->pid`
+* call `__get_work_proc_by_pid` to find the `work_proc_struct`
+* init `work_proc_struct` and add to the `work_proc_struct_list`
+
+##### 10. `deregister_process` function
+* use `sscanf` to get the `work_proc->pid`
+* call `__get_work_proc_by_pid` to get the `work_proc struct` with given `pid_t pid`
+* delete the `work_proc_struct` from the task struct list
+* if it's tha last `work_proc_struct`, call `cancel_delayed_work_sync` to wait and cancel the delayed work
+
+##### 11. `proc_write` function
 * in `mp1.c`, store `copy_from_user` information into `kbuf`
 * call different functions based on the first letter ( kbuf [0] )
-    * `REGISTRATION` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `register_process`
-    * `YIELD` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `yield_process`
-    * `DE_REGISTRATION` -----> `deregister_process`
+  * `REGISTRATION` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `register_process`
+  * `DE_REGISTRATION` -----> `deregister_process`
 
-##### 9. `admission_control` function
-* compute the `utilization_factor` sum of all the existing tasks in the task struct list
-* add the `utilization_factor` of the new task
-* if it's over `Utilization Bound` ignore the new task
+##### 12. `cdev_mmap` function
+* mapping the physical pages of the buffer to the virtual address space of a requested user process
 
-##### 10. `__get_task_by_pid` function
-* find the task in the task struct list with `pid` and return task
+##### 13. `update_data` function
+* work function to update data
+* loop through each `work_proc_struct` in the `work_proc_struct_list`
+  * call `get_cpu_use` to get all the data
+  * sum up the total utilization, total major page fault, and total minor page fault
+* write them into profiler buffer
+* enqueue `delayed_work` with delay
 
-##### 11. `timer_callback` function
-* use `container_of` find the `rms_task_struct` from the task struct list
-* set the `task->state` to `READY`
-
-##### 12. `register_process` function
-* use `sscanf` and `strsep` to get the `task->pid`, `task->period`, and `task->computation`
-* call `admission_control` function to check `Utilization_Bound`
-* add `rms_task_struct *task` to task struct list
-
-##### 13. `yield_process` function
-* check `task->deadline`
-* if `task->deadline` is passed, call `wake_up_process` to wake up the task
-
-##### 14. `deregister_process` function
-* delete the task from the task struct list, and delete `task->wakeup_timer`
-* if it's also the `cur_task`, set `cur_task` to NULL, and call `wake_up_process`
-
-##### 15. `get_highest_priority_ready_task` function
-* loop through task struct list and find the `READY` task with the `highest priority`
-
-##### 16. `__set_priority` function
-* set the `policy` & `priority` of the task
-
-##### 17. `dispatch_thread_fn` function
-* check if the kthread should stop by calling `kthread_should_stop`
-* get the `READY` task with the `highest priority`
-* if NO `READY` task, lower the priority of the `cur_task`
-* else `cur_task` is preempted by `READY` task
-* call `wake_up_process` on that task
-
-##### 18. exit
+##### 14. exit
 * remove `proc_entry` which is `/proc/mp1/status` file
 * remove `proc_dir` which is `/proc/mp1` directory
-* destroy 2 `mutex`
-* stop kernel thread `dispatch_thread`
-* delete & free the memory of the linked list with `list_for_each_entry_safe` macro
-* free kernel memory cache
-* destroy `struct kem_cache *rms_task_struct_cache`
-
-#### userapp.h & userapp.c
-
-##### 1. `register_process` function
-* open `/proc/mp1/status` file and write `R, <pid>, <period>, <computation_time>`
-
-##### 2. `process_exist` function
-* open `/proc/mp1/status` file and check if `pid` exists
-
-##### 3. `yield_process` function
-* open `/proc/mp1/status` file and write `Y, <pid>`
-
-##### 4. `deregister_process` function
-* open `/proc/mp1/status` file and write `D, <pid>`
-
-##### 5. `main` function
-* loop `do_job` function with `freq` to simulate periodic task
+* delete `cdev`
+* unregister `dev`
+* if there's still delayed work pending
+  * call `cancel_delayed_work_sync` to wait and cancel the `delayed work`
+* destroy workqueue
+* loop through `work_proc_struct_list` to delete and free the list
+* ClearPageReserved
 
 ## Developers
 * Hongbo Zheng [NetID: hongboz2]

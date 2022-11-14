@@ -4,12 +4,14 @@
 import sys
 import matplotlib.pyplot as plt
 
-CASE_STUDY_ANALYSIS_DIR='Case_Study_Analysis/'
-CASE_STUDY_1_WORK12='case_study_1_work_1&2.png'
-CASE_STUDY_1_WORK34='case_study_1_work_3&4.png'
-CASE_STUDY_2_FILE_NUM=35
 PROFILE_DATA_FILE_PREFIX='profile_'
 PROFILE_DATA_FILE_SUFFIX='.data'
+CASE_STUDY_1_WORK12_PNG_NAME='case_study_1_work_1_2.png'
+CASE_STUDY_1_WORK34_PNG_NAME='case_study_1_work_3_4.png'
+CASE_STUDY_2_FILE_NUM=5
+FILE_INDEX_LIST=[1,5,11,19,24]
+CASE_STUDY_ANALYSIS_DIR='Case_Study_Analysis/'
+CASE_STUDY_2_WORK5_PNG_NAME='case_study_2_work_5.png'
 DEBUG=0
 
 def plt_figure(case, pro_data):
@@ -56,18 +58,19 @@ def plt_figure(case, pro_data):
         if case == 0:
             plt.title('Work Process 1: $1024$MB Memory, Random Access, and 50,000 accesses per iteration\n'
                       'Work Process 2: $1024$MB Memory, Random Access, and 10,000 accesses per iteration', fontsize=10, weight='normal')
-            plt.savefig(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK12, dpi=1000)
-            print('[INFO]: Graph saved to %s'%(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK12))
+            plt.savefig(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK12_PNG_NAME, dpi=1000)
+            print('[INFO]: Graph saved to %s'%(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK12_PNG_NAME))
         elif case == 1:
-            plt.title('Work Process 3: $1024$MB Memory, Random Access, and 50,000 accesses per iteration\n'
+            plt.title('Work Process 3: $1024$MB Memory, Random Locality Access, and 50,000 accesses per iteration\n'
                       'Work Process 4: $1024$MB Memory, Locality-based Access, and 10,000 accesses per iteration', fontsize=10, weight='normal')
-            plt.savefig(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK34, dpi=1000)
-            print('[INFO]: Graph saved to %s'%(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK34))
+            plt.savefig(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK34_PNG_NAME, dpi=1000)
+            print('[INFO]: Graph saved to %s'%(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_1_WORK34_PNG_NAME))
         print('[INFO]: Finish plotting graph')
 
 def plt_thrashing(case_study_2_folder):
     ttl_util = []
-    for i in range(1,CASE_STUDY_2_FILE_NUM,1):
+    # for i in range(1,CASE_STUDY_2_FILE_NUM,1):
+    for i in FILE_INDEX_LIST:
         time, min_flt, maj_flt, util = [], [], [], []
         print('[INFO]: Reading from file %s...'%(case_study_2_folder+'/'+PROFILE_DATA_FILE_PREFIX+str(i)+PROFILE_DATA_FILE_SUFFIX))
         with open(case_study_2_folder+'/'+PROFILE_DATA_FILE_PREFIX+str(i)+PROFILE_DATA_FILE_SUFFIX, 'r') as pro_data_file:
@@ -89,20 +92,28 @@ def plt_thrashing(case_study_2_folder):
         print('[TTL_UTIL]:   ',ttl_util)
         print('[TTL_UTIL_LEN]',len(ttl_util))
     print('[INFO]: Finish reading from %s directory'%case_study_2_folder)
+    assert CASE_STUDY_2_FILE_NUM == len(FILE_INDEX_LIST) == len(ttl_util)
 
-    idx = list(range(1, len(ttl_util)+1))
-    plt.plot(idx, ttl_util)
-    plt.show()
-    return
+    print('[INFO]: Start plotting graph...')
+    plt.rcParams["font.family"] = "serif"
+    plt.rcParams["font.serif"] = ["Times New Roman"] + plt.rcParams["font.serif"]
+    plt.figure(figsize=(10, 6), dpi=1000)
+    plt.plot(FILE_INDEX_LIST, ttl_util, color='lightpink')
+    plt.xlabel(r'Time (Jiffies)', fontsize=10, weight='normal')
+    plt.ylabel(r'Total Utilization of N copies of Work Process 5 (Jiffies)', fontsize=10, weight='normal')
+    plt.suptitle('Total Utilization of N copies of Work Process 5 (Jiffies) vs. Time (Jiffies)', fontsize=13, weight='normal')
+    plt.title('Work Process 5: $200$MB Memory, Random Locality Access, and 10,000 accesses per iteration', fontsize=10, weight='normal')
+    plt.savefig(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_2_WORK5_PNG_NAME, dpi=1000)
+    print('[INFO]: Graph saved to %s'%(CASE_STUDY_ANALYSIS_DIR+CASE_STUDY_2_WORK5_PNG_NAME))
 
 def main():
     if len(sys.argv) != 4:
         print('[USAGE]: ./plt_fig.py <profile1.data_file> <profile2.data_file> <case_study_2_folder>')
         exit(1)
-    plt_figure(case=0, pro_data=sys.argv[1])
-    print('-'*35)
-    plt_figure(case=1, pro_data=sys.argv[2])
-    # plt_thrashing(sys.argv[3])
+    # plt_figure(case=0, pro_data=sys.argv[1])
+    # print('-'*35)
+    # plt_figure(case=1, pro_data=sys.argv[2])
+    plt_thrashing(sys.argv[3])
 
 if __name__ == '__main__':
     main()

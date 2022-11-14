@@ -12,9 +12,10 @@ nice ./work 1024 R 50000 & nice ./work 1024 L 10000
 wait
 ./monitor > profile2.data
 
-#for i in {1..35}; do
-#  for _ in $(seq 1 $i); do nice ./work 200 R 10000 & done
-#  wait
-#  ./monitor > profile_${i}.data
-#done
-cp profile* ../../linux/hello
+for i in 1 5 11 19 24
+do
+  for _ in $(seq 1 $i); do nice ./work 200 R 10000 & done
+  wait
+  ./monitor > profile_${i}.data
+done
+cp profile* ../../linux/Case_Study_2_Profile_Data

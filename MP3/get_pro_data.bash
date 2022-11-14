@@ -1,5 +1,7 @@
 DEV_MAJOR_NUM=423
 DEV_MINOR_NUM=0
+CASE_STUDY_1_PROFILE_DATA_DIR="linux/Case_Study_1_Profile_Data"
+CASE_STUDY_2_PROFILE_DATA_DIR="linux/Case_Study_2_Profile_Data"
 
 rmmod mp3
 make
@@ -11,6 +13,7 @@ wait
 nice ./work 1024 R 50000 & nice ./work 1024 L 10000
 wait
 ./monitor > profile2.data
+cp profile* ../../$CASE_STUDY_1_PROFILE_DATA_DIR
 
 for i in 1 5 11 19 24
 do
@@ -18,4 +21,4 @@ do
   wait
   ./monitor > profile_${i}.data
 done
-cp profile* ../../linux/Case_Study_2_Profile_Data
+cp profile* ../../$CASE_STUDY_2_PROFILE_DATA_DIR

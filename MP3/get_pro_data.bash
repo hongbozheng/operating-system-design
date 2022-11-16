@@ -15,7 +15,7 @@ wait
 ./monitor > profile2.data
 cp profile* ../../$CASE_STUDY_1_PROFILE_DATA_DIR
 
-for i in 1 5 11 19 24
+for i in 1 5 11 16 22
 do
   for _ in $(seq 1 $i); do nice ./work 200 R 10000 & done
   wait

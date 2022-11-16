@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# CMD: ./plt_fig.py profile1.data profile2.data Case_study_2_Profile_Data
+# CMD: ./plt_fig.py Case_Study_1_Profile_Data Case_Study_2_Profile_Data
 
 import sys
 import matplotlib.pyplot as plt

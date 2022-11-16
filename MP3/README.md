@@ -27,6 +27,35 @@ Run the following command
 ./get_pro_data.bash
 ```
 
+## Case Study Analysis
+
+#### Case Study 1: Thrashing & Locality
+* `Work process 1`: 1024MB Memory, Random Access, and 50,000 accesses per iteration
+* `Work process 2`: 1024MB Memory, Random Access, and 10,000 accesses per iteration
+
+* `Work process 3`: 1024MB Memory, Random Locality Access, and 50,000 accesses per iteration
+* `Work process 4`: 1024MB Memory, Locality-based Access, and 10,000 accesses per iteration
+
+_Work process 1 & work process 2_ has more page fault compared to _work process 3 & work process 4_
+because they use random access memory. In addition, _work process 4_ uses local access memory.
+Therefore, _work process 3 & work process 4_ have less page fault, and they have faster time.
+
+#### Case Study 2: Multiprogramming
+##### `NUM_CORE: 4, MEM: 4GB, SWAP: 1G`
+* `Work process 5`: 200MB Memory, Random Locality Access, and 10,000 accesses per iteration
+
+From `N=1` to `N=20`, CPU utilization increases as the number of processes (N) increases.
+However, the CPU utilization decreases during thrashing which is cased by page swaps.
+
+`Case Study 1` data in `Case_Study_1_Profile_Data` folder
+* profile1.data
+* profile2.data
+
+`Case Study 2` data in `Case_Study_2_Profile_Data` folder
+* 
+
+Figures are in `Case_Study_Analysis` folder
+
 ## Design
 
 #### mp3.h & mp3.c

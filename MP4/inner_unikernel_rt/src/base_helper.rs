@@ -16,6 +16,16 @@ pub(crate) fn bpf_trace_printk(fmt: &str, arg1: u64, arg2: u64, arg3: u64) -> i3
     code(fmt.as_ptr(), fmt.len() as u32, arg1, arg2, arg3)
 }
 
+/// Wrapper function around an external function with the C ABI, used to read data from kernel memory.
+///
+/// ## Arguments
+///
+/// * `dst` - A mutable reference to a type `T` where the read data will be stored.
+/// * `unsafe_ptr` - A pointer to some data in kernel memory to be read.
+///
+/// ## Returns
+///
+/// An `i64` value representing the result of calling the external function with the given arguments.
 pub(crate) fn bpf_probe_read_kernel<T>(dst: &mut T, unsafe_ptr: *const ()) -> i64 {
     // TODO: Make it do something useful
     let ptr = stub::STUB_BPF_PROBE_READ_KERNEL as *const ();

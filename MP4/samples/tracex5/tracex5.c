@@ -59,18 +59,21 @@ int main(void)
     struct bpf_program *prog;
     struct bpf_object *obj;
 
+    /* open and load object */
     obj = iu_object__open(EXE);
     if (!obj) {
         fprintf(stderr, "ERROR: failed to open obj\n");
         exit(1);
     }
 
+    /* find the program in a BPF object */
     prog = bpf_object__find_program_by_name(obj, "iu_prog1");
     if (!prog) {
         fprintf(stderr, "ERROR: finding a prog in obj file failed\n");
         exit(1);
     }
 
+    /* attach a BPF program to a socket in the kernel */
     link = bpf_program__attach(prog);
     if (libbpf_get_error(link)) {
         fprintf(stderr, "ERROR: bpf_program__attach failed\n");

@@ -1,0 +1,39 @@
+[package]
+name = "inner_unikernel_rt"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+# rlibc = "1.0.0"
+
+[profile.dev]
+debug=0
+panic = "abort"
+
+[profile.release]
+debug=0
+panic = "abort"
+
+[inner_unikernel]
+helpers = [
+    'bpf_get_current_comm',
+    'bpf_get_current_pid_tgid',
+    'bpf_get_smp_processor_id',
+    'bpf_get_stackid_pe',
+    'bpf_map_lookup_elem',
+    'bpf_map_update_elem',
+    'bpf_perf_prog_read_value',
+    'bpf_probe_read_kernel',
+    'bpf_trace_printk_iu'
+]
+
+headers = [
+    "linux/bpf.h",
+    "linux/perf_event.h",
+    "linux/ptrace.h",
+    "linux/seccomp.h",
+    "linux/unistd.h",
+]

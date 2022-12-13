@@ -29,6 +29,8 @@ pub(crate) fn bpf_trace_printk(fmt: &str, arg1: u64, arg2: u64, arg3: u64) -> i3
 pub(crate) fn bpf_probe_read_kernel<T>(dst: &mut T, unsafe_ptr: *const ()) -> i64 {
     // TODO: Make it do something useful
     let ptr = stub::STUB_BPF_PROBE_READ_KERNEL as *const ();
+    // Ref: https://elixir.bootlin.com/linux/v5.15.79/source/kernel/bpf/core.c#L1369
+    // Ref: https://man7.org/linux/man-pages/man7/bpf-helpers.7.html
     let code: extern "C" fn(*mut (), u32, *const ()) -> i64 = unsafe { core::mem::transmute(ptr) };
     let size = core::mem::size_of::<T>();
     code(dst as *mut T as *mut (), size as u32, unsafe_ptr)

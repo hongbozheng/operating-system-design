@@ -30,11 +30,22 @@ fn PT_REGS_PARM2(regs: &pt_regs) -> u64 {
 // You should also refer to samples/hello on how to make you function a
 // inner-unikernel-program that is recognized by the compiler and loader library
 
-/// This function is a BPF program that is intended to be attached to a socket in the Linux
-/// kernel to filter incoming and outgoing network packets. The program looks for specific
-/// system calls (e.g. __NR_write, __NR_read, __NR_mmap) and performs some action when it
-/// encounters them. The program also checks for system calls within a certain range
-/// (__NR_getuid to __NR_getsid) and prints a message when it encounters one of these system calls.
+/// A function that is called when a system call is executed.
+///
+/// This function uses a `kprobe` and `pt_regs` object to determine the system call number and call
+/// the appropriate function to handle the system call. If the system call number is not handled by
+/// any of the specific functions, the function will print a message if the system call number is
+/// within a certain range (i.e. between `__NR_getuid` and `__NR_getsid` inclusive).
+///
+/// ## Arguments
+///
+/// * `obj` - A `kprobe` object that contains information about the probe point.
+/// * `ctx` - A `pt_regs` object that contains the register values at the time of the probe.
+///
+/// ## Returns
+///
+/// This function returns a `u32` value representing the result of the system call. In this case, the
+/// value is always 0.
 fn iu_prog1(obj: &kprobe, ctx: &pt_regs) -> u32 {
     let sc_nr = PT_REGS_PARM1(ctx) as u32;
     match sc_nr {
@@ -50,9 +61,20 @@ fn iu_prog1(obj: &kprobe, ctx: &pt_regs) -> u32 {
     return 0;
 }
 
-/// This function is a BPF program that is called when the __NR_write system call is made.
-/// The function checks the size of the data being written and, if the size is equal to 512,
-/// it prints a message with the file descriptor, buffer, and size of the data being written.
+/// A function that is called when a `SYS_write` system call is executed.
+///
+/// This function uses a `kprobe` and `pt_regs` object to read arguments from the system call and print
+/// a message if the `size` argument is 512.
+///
+/// ## Arguments
+///
+/// * `obj` - A `kprobe` object that contains information about the probe point.
+/// * `ctx` - A `pt_regs` object that contains the register values at the time of the probe.
+///
+/// ## Returns
+///
+/// This function returns a `u32` value representing the result of the system call. In this case, the
+/// value is always 0.
 fn SYS__NR_write(obj: &kprobe, ctx: &pt_regs) -> u32 {
     let mut sd = seccomp_data {
         nr: 0,
@@ -67,10 +89,20 @@ fn SYS__NR_write(obj: &kprobe, ctx: &pt_regs) -> u32 {
     return 0;
 }
 
-/// This function is a BPF program that is called when the __NR_read system call is made.
-/// The function checks the size of the data being read and, if the size is greater than
-/// 128 and less than or equal to 1024, it prints a message with the file descriptor,
-/// buffer, and size of the data being read.
+/// A function that is called when a `SYS_read` system call is executed.
+///
+/// This function uses a `kprobe` and `pt_regs` object to read arguments from the system call and print
+/// a message if the `size` argument is between 128 and 1024 (inclusive).
+///
+/// ## Arguments
+///
+/// * `obj` - A `kprobe` object that contains information about the probe point.
+/// * `ctx` - A `pt_regs` object that contains the register values at the time of the probe.
+///
+/// ## Returns
+///
+/// This function returns a `u32` value representing the result of the system call. In this case, the
+/// value is always 0.
 fn SYS__NR_read(obj: &kprobe, ctx: &pt_regs) -> u32 {
     let mut sd = seccomp_data {
         nr: 0,
@@ -85,8 +117,20 @@ fn SYS__NR_read(obj: &kprobe, ctx: &pt_regs) -> u32 {
     return 0;
 }
 
-/// This function is a BPF program that is called when the __NR_mmap system call is made.
-/// When this function is called, it simply prints a message with the string "mmap".
+/// A function that is called when a `SYS_mmap` system call is executed.
+///
+/// This function uses a `kprobe` object to print a message indicating that the `SYS_mmap` system call
+/// has been executed.
+///
+/// ## Arguments
+///
+/// * `obj` - A `kprobe` object that contains information about the probe point.
+/// * `ctx` - A `pt_regs` object that contains the register values at the time of the probe.
+///
+/// ## Returns
+///
+/// This function returns a `u32` value representing the result of the system call. In this case, the
+/// value is always 0.
 fn SYS__NR_mmap(obj: &kprobe, ctx: &pt_regs) -> u32 {
     obj.bpf_trace_printk("mmap\n", 0, 0, 0);
     return 0;

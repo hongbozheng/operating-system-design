@@ -30,6 +30,11 @@ fn PT_REGS_PARM2(regs: &pt_regs) -> u64 {
 // You should also refer to samples/hello on how to make you function a
 // inner-unikernel-program that is recognized by the compiler and loader library
 
+/// This function is a BPF program that is intended to be attached to a socket in the Linux
+/// kernel to filter incoming and outgoing network packets. The program looks for specific
+/// system calls (e.g. __NR_write, __NR_read, __NR_mmap) and performs some action when it
+/// encounters them. The program also checks for system calls within a certain range
+/// (__NR_getuid to __NR_getsid) and prints a message when it encounters one of these system calls.
 fn iu_prog1(obj: &kprobe, ctx: &pt_regs) -> u32 {
     let sc_nr = PT_REGS_PARM1(ctx) as u32;
     match sc_nr {
@@ -45,6 +50,9 @@ fn iu_prog1(obj: &kprobe, ctx: &pt_regs) -> u32 {
     return 0;
 }
 
+/// This function is a BPF program that is called when the __NR_write system call is made.
+/// The function checks the size of the data being written and, if the size is equal to 512,
+/// it prints a message with the file descriptor, buffer, and size of the data being written.
 fn SYS__NR_write(obj: &kprobe, ctx: &pt_regs) -> u32 {
     let mut sd = seccomp_data {
         nr: 0,
@@ -59,6 +67,10 @@ fn SYS__NR_write(obj: &kprobe, ctx: &pt_regs) -> u32 {
     return 0;
 }
 
+/// This function is a BPF program that is called when the __NR_read system call is made.
+/// The function checks the size of the data being read and, if the size is greater than
+/// 128 and less than or equal to 1024, it prints a message with the file descriptor,
+/// buffer, and size of the data being read.
 fn SYS__NR_read(obj: &kprobe, ctx: &pt_regs) -> u32 {
     let mut sd = seccomp_data {
         nr: 0,
@@ -73,10 +85,16 @@ fn SYS__NR_read(obj: &kprobe, ctx: &pt_regs) -> u32 {
     return 0;
 }
 
+/// This function is a BPF program that is called when the __NR_mmap system call is made.
+/// When this function is called, it simply prints a message with the string "mmap".
 fn SYS__NR_mmap(obj: &kprobe, ctx: &pt_regs) -> u32 {
     obj.bpf_trace_printk("mmap\n", 0, 0, 0);
     return 0;
 }
 
+// The #[link_section] attribute specifies the section of the ELF file where the PROG variable
+// should be placed. In this case, the variable will be placed in the "kprobe/__seccomp_filter"
+// section of the ELF file.
 #[link_section = "kprobe/__seccomp_filter"]
+// define a BPF program in Linux kernel
 static PROG: kprobe = kprobe::new(iu_prog1, "iu_prog1");

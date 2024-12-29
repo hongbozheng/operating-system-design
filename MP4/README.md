@@ -1,4 +1,4 @@
-# MP4: Rust-based inner-unikernels
+# Rust-based inner-unikernels
 
 **Note: You need to be on the x86-64 architecture in order to work on this
 MP. We assume the x86-64 architecture and ABI in this writeup.**
@@ -273,33 +273,38 @@ you can always learn a language by writing the code.
     - [The Rust playground](https://play.rust-lang.org) (for trying out programs)
 
 ## Design Documentation
-##### 1. Follow the linux [tracex5_user.c](https://elixir.bootlin.com/linux/v5.15.79/source/samples/bpf/tracex5_kern.c) and implement `tracex5.c`
-* open & load object
-* find the program in a BPF object
-* attach a BPF program to a socket in the kernel
+1. Follow the linux [tracex5_user.c](https://elixir.bootlin.com/linux/v5.15.79/source/samples/bpf/tracex5_kern.c) and implement `tracex5.c`.
+- Open & load object.
+- Find the program in a BPF object.
+- Attach a BPF program to a socket in the kernel.
 
-##### 2. Follow the linux [tracex5_kern.c](https://elixir.bootlin.com/linux/v5.15.79/source/samples/bpf/tracex5_kern.c)
-##### Implement function `iu_prog1`
-* determine the system call number and call the appropriate function to handle the system call
-* if the system call number is not handled by any of the specific functions, the function will print a message
-  if the system call number is within a certain range (i.e. between `__NR_getuid` and `__NR_getsid` inclusive)
+2. Follow the linux [tracex5_kern.c](https://elixir.bootlin.com/linux/v5.15.79/source/samples/bpf/tracex5_kern.c)
+Implement function `iu_prog1`
+- Determine the system call number and call the appropriate function to handle 
+the system call.
+- If the system call number is not handled by any of the specific functions, 
+  the function will print a message if the system call number is within a 
+  certain range (i.e. between `__NR_getuid` and `__NR_getsid` inclusive).
 
-##### Implement function `SYS__NR_write`
-* a function that is called when a `SYS_write` system call is executed
-* the function uses a `kprobe` and `pt_regs` object to read arguments from the system call and print
-  a message if the `size` argument is 512
+Implement function `SYS__NR_write`
+- A function that is called when a `SYS_write` system call is executed
+- The function uses a `kprobe` and `pt_regs` object to read arguments from the 
+  system call and print a message if the `size` argument is 512.
 
-##### Implement function `SYS__NR_read`
-* a function that is called when a `SYS_read` system call is executed
-* the function uses a `kprobe` and `pt_regs` object to read arguments from the system call and print
-  a message if the `size` argument is between 128 and 1024 (inclusive)
+Implement function `SYS__NR_read`
+- a function that is called when a `SYS_read` system call is executed
+- the function uses a `kprobe` and `pt_regs` object to read arguments from the 
+  system call and print a message if the `size` argument is between 128 and 1024 
+  (inclusive).
 
-##### Implement function `SYS__NR_mmap`
-* a function that is called when a `SYS_mmap` system call is executed
-* the function uses a `kprobe` object to print a message indicating that the `SYS_mmap` system call has been executed
+Implement function `SYS__NR_mmap`
+- A function that is called when a `SYS_mmap` system call is executed.
+- The function uses a `kprobe` object to print a message indicating that the 
+  `SYS_mmap` system call has been executed.
 
-##### Follow `main.rs` in the `hello` program
-* define a BPF program in Linux kernel
+Follow `main.rs` in the `hello` program
+- Define a BPF program in Linux kernel.
 
-##### 3. Follow the [bpf_probe_read_kernel](https://elixir.bootlin.com/linux/v5.15.79/source/kernel/bpf/core.c#L1369) prototype and the functions in `base_helper.rs`
-* implement function `bpf_probe_read_kernel`
+3. Follow the [bpf_probe_read_kernel](https://elixir.bootlin.com/linux/v5.15.79/source/kernel/bpf/core.c#L1369) prototype and the functions in 
+   `base_helper.rs`
+- Implement function `bpf_probe_read_kernel`.

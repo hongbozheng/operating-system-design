@@ -129,7 +129,7 @@ and cancel the delayed work.
 11. `proc_write` function
 - In `mp1.c`, store `copy_from_user` information into `kbuf`.
 - Call different functions based on the first letter ( kbuf [0] ).
-  - `REGISTRATION` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `register_process`.
+  - `REGISTRATION` &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; -----> `register_process`.
   - `DE_REGISTRATION` -----> `deregister_process`.
 
 12. `cdev_mmap` function

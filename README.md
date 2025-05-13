@@ -2,8 +2,6 @@
 
 Operating System Design Materials.
 
-Instructor: Tianyin Xu
-
 ## 📝 Assignments
 - [Introduction to Linux Kernel Programming](https://github.com/hongbozheng/operating-system-design/tree/main/mp1)
 - [Rate-Monotonic CPU Scheduling](https://github.com/hongbozheng/operating-system-design/tree/main/mp2)

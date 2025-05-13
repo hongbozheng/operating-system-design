@@ -12,7 +12,7 @@ CASE_STUDY_1_WORK_3_4_PNG_NAME='case-study-1-work-3-4.png'
 # FILE_INDEX_LIST=[1,5,11,19,22]
 CASE_STUDY_2_FILE_NUM=6
 FILE_INDEX_LIST=[1,5,11,16,20,22]
-CASE_STUDY_ANALYSIS_DIR= 'case-study-analysis/'
+CASE_STUDY_ANALYSIS_DIR= 'case_study_analysis/'
 CASE_STUDY_2_WORK_5_PNG_NAME='case-study-2-work-5.png'
 DEBUG=0
 

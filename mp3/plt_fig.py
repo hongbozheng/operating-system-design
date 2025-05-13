@@ -6,14 +6,14 @@ import matplotlib.pyplot as plt
 
 PROFILE_DATA_FILE_PREFIX='profile_'
 PROFILE_DATA_FILE_SUFFIX='.data'
-CASE_STUDY_1_WORK_1_2_PNG_NAME='case_study_1_work_1_2.png'
-CASE_STUDY_1_WORK_3_4_PNG_NAME='case_study_1_work_3_4.png'
+CASE_STUDY_1_WORK_1_2_PNG_NAME='case-study-1-work-1-2.png'
+CASE_STUDY_1_WORK_3_4_PNG_NAME='case-study-1-work-3-4.png'
 # CASE_STUDY_2_FILE_NUM=5
 # FILE_INDEX_LIST=[1,5,11,19,22]
 CASE_STUDY_2_FILE_NUM=6
 FILE_INDEX_LIST=[1,5,11,16,20,22]
-CASE_STUDY_ANALYSIS_DIR='Case_Study_Analysis/'
-CASE_STUDY_2_WORK_5_PNG_NAME='case_study_2_work_5.png'
+CASE_STUDY_ANALYSIS_DIR= 'case-study-analysis/'
+CASE_STUDY_2_WORK_5_PNG_NAME='case-study-2-work-5.png'
 DEBUG=0
 
 def plt_figure(case, case_study_1_folder):
